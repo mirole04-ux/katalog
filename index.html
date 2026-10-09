@@ -245,13 +245,14 @@
 <div class="container">
     <div id="error-msg"></div>
 
-    <div class="select-container">
+    <!-- Výběr položky (veřejným návštěvníkům z QR kódu se skryje) -->
+    <div class="select-container" id="select-box">
         <select id="item-select" onchange="renderSelectedItem()"></select>
     </div>
 
     <div class="image-container">
         <span class="badge" id="item-id">#M-000</span>
-        <button class="qr-btn" onclick="showQRCode()">QR Kód</button>
+        <button class="qr-btn" id="qr-btn" onclick="showQRCode()">QR Kód</button>
         <img id="hero-img" src="https://via.placeholder.com/480x260?text=Načítání..." alt="Artefakt">
     </div>
 
@@ -311,6 +312,7 @@
 
 <script>
     let allItems = [];
+    let isSingleItemView = false;
 
     function showError(msg) {
         const err = document.getElementById('error-msg');
@@ -392,17 +394,29 @@
                 select.appendChild(opt);
             });
 
+            // Kontrola, zda návštěvník přišel přes přímý QR kód nože (?id=...)
             const urlParams = new URLSearchParams(window.location.search);
             const reqId = urlParams.get('id');
+
             if (reqId) {
+                isSingleItemView = true;
+                // Skryje výběrovou roletku a generování QR kódu
+                document.getElementById('select-box').style.display = 'none';
+                document.getElementById('qr-btn').style.display = 'none';
+
                 const foundIndex = allItems.findIndex((item, idx) => {
                     const code = getItemCode(item, idx).replace(/[^0-9]/g, '');
                     const searchId = reqId.replace(/[^0-9]/g, '');
                     return code === searchId || String(item._jsonKey) === String(reqId);
                 });
+
                 if (foundIndex !== -1) {
                     select.value = foundIndex;
                 }
+            } else {
+                // Hlavní vstup (vy): roletka i tlačítko QR kódu zůstanou zobrazené
+                document.getElementById('select-box').style.display = 'block';
+                document.getElementById('qr-btn').style.display = 'block';
             }
 
             renderSelectedItem();
@@ -487,6 +501,7 @@
         document.getElementById('qr-title').innerText = title;
         document.getElementById('qrcode').innerHTML = '';
 
+        // Tento odkaz generuje QR kód určený výhradně pro veřejnost (skryje výběrovou nabídku)
         let targetURL = "https://mirole04-ux.github.io/katalog/?id=" + cleanId;
         document.getElementById('qr-url-text').innerText = targetURL;
 
@@ -503,7 +518,7 @@
         document.getElementById('qr-modal').style.display = 'none';
     }
 
-    fetch('katalog.json')
+    fetch('katalog.json?t=' + Date.now())
         .then(res => {
             if (!res.ok) throw new Error("Soubor katalog.json nebyl nalezen (HTTP " + res.status + ")");
             return res.json();
