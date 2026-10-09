@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Artefaktu | Sbírka</title>
+    <!-- Knihovna pro přímé generování QR kódů v prohlížeči -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent: #d4af37;
+            --text-main: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border: #333333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .mobile-container {
+            width: 100%;
+            max-width: 480px;
+            background-color: var(--card-bg);
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            padding-bottom: 40px;
+        }
+
+        .selector-box {
+            background: #181818;
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            background: #2a2a2a;
+            color: #ffffff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        .hero-image {
+            width: 100%;
+            height: 260px;
+            object-fit: cover;
+            background-color: #2a2a2a;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: rgba(212, 175, 55, 0.15);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+        }
+
+        .qr-btn {
+            background: rgba(212, 175, 55, 0.2);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0 0 5px 0;
+            color: #ffffff;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        .specs-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .spec-item {
+            background-color: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .spec-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .spec-value {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 6px;
+            margin-top: 25px;
+            margin-bottom: 12px;
+        }
+
+        p.description {
+            line-height: 1.5;
+            color: #cccccc;
+            font-size: 0.95rem;
+            margin: 0;
+        }
+
+        .tech-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+
+        .tech-table td {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .tech-table td:first-child {
+            color: var(--text-muted);
+            width: 45%;
+        }
+
+        .footer-tag {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 30px;
+            opacity: 0.5;
+        }
+
+        /* Modal okno pro QR kód */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: #1e1e1e;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid var(--accent);
+            text-align: center;
+            max-width: 300px;
+        }
+
+        #qrcode {
+            margin: 15px auto;
+            display: flex;
+            justify-content: center;
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .close-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .file-loader {
+            background: #252525;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="mobile-container">
+    <!-- Výběr artefaktu ze seznamu -->
+    <div class="selector-box">
+        <select id="item-select" onchange="renderSelectedItem()">
+            <option value="">Načítám seznam artefaktů...</option>
+        </select>
+    </div>
+
+    <img id="hero-img" class="hero-image" src="https://via.placeholder.com/480x260?text=Bez+fotografie" alt="Artefakt">
+    
+    <div class="content">
+        <div id="loader-box" class="file-loader" style="display:none;">
+            Vyber soubor katalog.json: <input type="file" id="json-file-input" accept=".json">
+        </div>
+
+        <div class="header-row">
+            <div id="item-id" class="badge">#---</div>
+            <button class="qr-btn" onclick="showQRCode()">QR Kód</button>
+        </div>
+
+        <h1 id="item-title">Načítám artefakt...</h1>
+        <div id="item-subtitle" class="subtitle">---</div>
+
+        <div class="specs-grid">
+            <div class="spec-item">
+                <div class="spec-label">Ocel / Materiál</div>
+                <div id="spec-steel" class="spec-value">-</div>
+            </div>
+            <div class="spec-item">
+                <div class="spec-label">Tvrdost</div>
+                <div id="spec-hrc" class="spec-value">-</div>
+            </div>
+            <div class="spec-item">
+                <div class="spec-label">Konstrukce</div>
+                <div id="spec-construction" class="spec-value">-</div>
+            </div>
+            <div class="spec-item">
+                <div class="spec-label">Země původu</div>
+                <div id="spec-origin" class="spec-value">-</div>
+            </div>
+        </div>
+
+        <div class="section-title">Pořízení & Expedice</div>
+        <table class="tech-table">
+            <tr><td>Země získání:</td><td id="origin-country">-</td></tr>
+            <tr><td>Místo pořízení:</td><td id="origin-place">-</td></tr>
+            <tr><td>Expedice / Cesta:</td><td id="origin-expedition">-</td></tr>
+            <tr><td>Datum / Rok:</td><td id="origin-year">-</td></tr>
+        </table>
+
+        <div class="section-title">Příběh & Popis</div>
+        <p id="item-description" class="description">Načítám podrobný popis ze souboru...</p>
+
+        <div class="section-title">Technická specifikace</div>
+        <table class="tech-table">
+            <tr><td>Délka čepele:</td><td id="tech-blade-len">-</td></tr>
+            <tr><td>Tloušťka čepele:</td><td id="tech-blade-thick">-</td></tr>
+            <tr><td>Celková délka:</td><td id="tech-total-len">-</td></tr>
+            <tr><td>Materiál rukojeti:</td><td id="tech-handle">-</td></tr>
+            <tr><td>Pouzdro:</td><td id="tech-sheath">-</td></tr>
+            <tr><td>Pojistka:</td><td id="tech-lock">-</td></tr>
+        </table>
+
+        <div class="footer-tag">Kolekce Artefaktů • Privátní Registr</div>
+    </div>
+</div>
+
+<!-- Modal okno pro QR kód -->
+<div id="qr-modal" class="modal">
+    <div class="modal-content">
+        <h3 id="qr-title" style="margin-top:0; color:var(--accent);">QR Kód</h3>
+        <div id="qrcode"></div>
+        <p id="qr-url-text" style="font-size:0.75rem; color:#aaa; word-break: break-all;"></p>
+        <button class="close-btn" onclick="hideQRCode()">Zavřít</button>
+    </div>
+</div>
+
+<script>
+    let allItems = [];
+
+    function formatDate(raw) {
+        if (!raw) return "-";
+        if (typeof raw === 'string' && raw.includes('T')) {
+            const d = new Date(raw);
+            if (!isNaN(d.getTime())) return d.toLocaleDateString('cs-CZ');
+        }
+        return raw;
+    }
+
+    // Odolné určení Země získání
+    function getCountryOfAcquisition(item) {
+        if (item["Země získání"] && item["Země získání"] !== "null") {
+            return item["Země získání"];
+        }
+        
+        const place = item["Kde byl pořízen"] || "";
+        if (place.toLowerCase().includes("karviná") || place.toLowerCase().includes("česk")) {
+            return "Česká republika";
+        }
+        if (place.toLowerCase().includes("finsko") || place.toLowerCase().includes("helsinky")) {
+            return "Finsko";
+        }
+        if (place.toLowerCase().includes("tunis")) {
+            return "Tunisko";
+        }
+        
+        // Fallback na zemi původu
+        return item["Země původu"] || "-";
+    }
+
+    function initCatalog(data) {
+        allItems = data["List 1"] ? Object.values(data["List 1"]) : (Array.isArray(data) ? data : [data]);
+        
+        const select = document.getElementById('item-select');
+        select.innerHTML = '';
+
+        allItems.forEach((item, index) => {
+            const opt = document.createElement('option');
+            opt.value = index;
+            const title = item["Název nože"] || "Artefakt #" + (index + 1);
+            opt.innerText = `${index + 1}. ${title}`;
+            select.appendChild(opt);
+        });
+
+        // Kontrola, zda URL neobsahuje parametr ?id=...
+        const urlParams = new URLSearchParams(window.location.search);
+        const reqId = urlParams.get('id');
+        if (reqId && !isNaN(reqId) && parseInt(reqId) > 0 && parseInt(reqId) <= allItems.length) {
+            select.value = parseInt(reqId) - 1;
+        }
+
+        renderSelectedItem();
+    }
+
+    function renderSelectedItem() {
+        const select = document.getElementById('item-select');
+        const index = select.value || 0;
+        const item = allItems[index];
+        if (!item) return;
+
+        // Hlavička
+        document.getElementById('item-id').innerText = "#M-" + String(parseInt(index) + 1).padStart(3, '0');
+        document.getElementById('item-title').innerText = item["Název nože"] || "Bez názvu";
+        document.getElementById('item-subtitle').innerText = (item["Výrobce nože/značka"] || "") + " • " + (item["Kategorie"] || "");
+
+        // Rychlé dlaždice
+        document.getElementById('spec-steel').innerText = item["Mat. čepele"] || "-";
+        document.getElementById('spec-hrc').innerText = item["Tvrdost"] ? item["Tvrdost"] + " HRC" : "-";
+        document.getElementById('spec-construction').innerText = item["Druh zbraně"] || item["Typ zbraně"] || "-";
+        document.getElementById('spec-origin').innerText = item["Země původu"] || "-";
+
+        // Pořízení & Expedice
+        document.getElementById('origin-country').innerText = getCountryOfAcquisition(item);
+        document.getElementById('origin-place').innerText = item["Kde byl pořízen"] || "-";
+        document.getElementById('origin-expedition').innerText = item["Status ve sbírce"] || item["ID_Expedice"] || "-";
+        document.getElementById('origin-year').innerText = formatDate(item["Datum pořízení"]);
+
+        // Popis
+        document.getElementById('item-description').innerText = item["Popis"] || item["Krátký popis"] || "Bez popisu.";
+
+        // Technické parametry
+        document.getElementById('tech-blade-len').innerText = item["Délka čepele cm"] ? item["Délka čepele cm"] + " cm" : "-";
+        document.getElementById('tech-blade-thick').innerText = item["Tloušťka čepeli mm"] ? item["Tloušťka čepeli mm"] + " mm" : "-";
+        document.getElementById('tech-total-len').innerText = item["Celková délka cm"] ? item["Celková délka cm"] + " cm" : "-";
+        document.getElementById('tech-handle').innerText = item["Mat.rukojeti"] || "-";
+        document.getElementById('tech-sheath').innerText = item["Pouzdro"] || "-";
+        document.getElementById('tech-lock').innerText = item["Typ pojistky"] || "-";
+
+        // Náhledová fotka
+        if (item["Foto hlavní"]) {
+            document.getElementById('hero-img').src = item["Foto hlavní"];
+        } else {
+            document.getElementById('hero-img').src = "https://via.placeholder.com/480x260?text=Bez+fotografie";
+        }
+    }
+
+    function showQRCode() {
+        const select = document.getElementById('item-select');
+        const index = parseInt(select.value || 0) + 1;
+        const item = allItems[index - 1];
+        const title = item ? item["Název nože"] : "Artefakt";
+        
+        document.getElementById('qr-title').innerText = title;
+        document.getElementById('qrcode').innerHTML = '';
+
+        // Vytvoření cílové URL adresy (připraveno pro doménu / web)
+        let targetURL = window.location.href.split('?')[0].split('#')[0] + "?id=" + index;
+        
+        document.getElementById('qr-url-text').innerText = targetURL;
+
+        new QRCode(document.getElementById("qrcode"), {
+            text: targetURL,
+            width: 180,
+            height: 180
+        });
+
+        document.getElementById('qr-modal').style.display = 'flex';
+    }
+
+    function hideQRCode() {
+        document.getElementById('qr-modal').style.display = 'none';
+    }
+
+    fetch('katalog.json')
+        .then(res => res.json())
+        .then(data => initCatalog(data))
+        .catch(() => {
+            document.getElementById('loader-box').style.display = 'block';
+        });
+
+    document.getElementById('json-file-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            initCatalog(JSON.parse(evt.target.result));
+            document.getElementById('loader-box').style.display = 'none';
+        };
+        reader.readAsText(file);
+    });
+</script>
+
+</body>
+</html>
