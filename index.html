@@ -151,7 +151,6 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            /* Schová rozbitý alt text z prohlížeče */
             color: transparent;
         }
 
@@ -610,9 +609,10 @@
     }
 
     function parsePrice(item) {
-        const p = item["Cena kč"];
+        const p = item["Cena"] || item["Cena kč"];
         if (p === null || p === undefined || p === "") return 0;
-        const num = parseFloat(p);
+        let strP = String(p).replace(/\s+/g, '').replace(',', '.');
+        const num = parseFloat(strP);
         return isNaN(num) ? 0 : num;
     }
 
@@ -625,6 +625,9 @@
 
     function getItemCode(item, index) {
         if (!item) return "M-001";
+        if (item._jsonKey && String(item._jsonKey).startsWith("M-")) {
+            return String(item._jsonKey);
+        }
         if (item._jsonKey && !isNaN(item._jsonKey)) {
             return "M-" + String(item._jsonKey).padStart(3, '0');
         }
@@ -643,18 +646,41 @@
         return "M-" + String(index + 1).padStart(3, '0');
     }
 
+    function getItemName(item) {
+        return item["Název zkrácený-hlavní"] || item["Název nože"] || item["Název úplný"] || "Artefakt";
+    }
+
+    function getItemCategory(item) {
+        return item["Kategorie_styl"] || item["Kategorie"] || "Bez kategorie";
+    }
+
+    function getItemCollection(item) {
+        for (let k in item) {
+            if (k.toLowerCase().includes("kolekce")) {
+                if (item[k] && item[k] !== "null") return String(item[k]).trim();
+            }
+        }
+        return item["Status ve sbírce"] || "";
+    }
+
     function getAllPhotos(item) {
         let photos = [];
         if (!item) return photos;
 
-        if (item["Foto hlavní"] && item["Foto hlavní"] !== "null") {
-            photos.push(item["Foto hlavní"]);
+        const mainPhotoKeys = ["Foto hlavní", "Fotky (Galerie)", "Foto", "Obrázek"];
+        for (let k of mainPhotoKeys) {
+            if (item[k] && item[k] !== "null") {
+                const parts = String(item[k]).split(',').map(p => p.trim()).filter(p => p);
+                photos.push(...parts);
+            }
         }
+
         if (item["Foto galérie"] && item["Foto galérie"] !== "null") {
-            const gal = item["Foto galérie"].split(',').map(p => p.trim()).filter(p => p);
+            const gal = String(item["Foto galérie"]).split(',').map(p => p.trim()).filter(p => p);
             photos.push(...gal);
         }
-        return photos;
+
+        return [...new Set(photos)];
     }
 
     function populateFilterDropdowns() {
@@ -665,13 +691,11 @@
         const collections = new Set();
 
         allItems.forEach(item => {
-            if (item["Kategorie"] && item["Kategorie"] !== "null") {
-                categories.add(item["Kategorie"].trim());
-            }
-            const status = item["Status ve sbírce"];
-            if (status && status !== "null") {
-                collections.add(status.trim());
-            }
+            const cat = getItemCategory(item);
+            if (cat && cat !== "Bez kategorie") categories.add(cat);
+
+            const col = getItemCollection(item);
+            if (col) collections.add(col);
         });
 
         catSelect.innerHTML = '<option value="">Všechny kategorie</option>';
@@ -698,13 +722,13 @@
         const sortOption = document.getElementById('sort-select').value;
 
         filteredItems = allItems.filter(item => {
-            const matchesCategory = !category || item["Kategorie"] === category;
-            const matchesCollection = !collection || item["Status ve sbírce"] === collection;
+            const matchesCategory = !category || getItemCategory(item) === category;
+            const matchesCollection = !collection || getItemCollection(item) === collection;
             
-            const name = (item["Název nože"] || "").toLowerCase();
-            const steel = (item["Mat. čepele"] || "").toLowerCase();
-            const maker = (item["Výrobce nože/značka"] || "").toLowerCase();
-            const desc = (item["Popis"] || "").toLowerCase();
+            const name = getItemName(item).toLowerCase();
+            const steel = (item["Mat. čepele / hlavní části"] || item["Mat. čepele"] || "").toLowerCase();
+            const maker = (item["Výrobce"] || item["Výrobce nože/značka"] || "").toLowerCase();
+            const desc = (item["Detailní_popis_Příběh"] || item["Popis"] || "").toLowerCase();
 
             const matchesQuery = !query || name.includes(query) || steel.includes(query) || maker.includes(query) || desc.includes(query);
 
@@ -716,7 +740,7 @@
             if (sortOption === "price-asc") return parsePrice(a) - parsePrice(b);
             if (sortOption === "date-desc") return parseDate(b) - parseDate(a);
             if (sortOption === "date-asc") return parseDate(a) - parseDate(b);
-            if (sortOption === "name-asc") return (a["Název nože"] || "").localeCompare(b["Název nože"] || "");
+            if (sortOption === "name-asc") return getItemName(a).localeCompare(getItemName(b));
             
             const codeA = parseInt(getItemCode(a, a._originalIndex).replace(/[^0-9]/g, '')) || 0;
             const codeB = parseInt(getItemCode(b, b._originalIndex).replace(/[^0-9]/g, '')) || 0;
@@ -740,9 +764,10 @@
 
         filteredItems.forEach(item => {
             const code = getItemCode(item, item._originalIndex);
-            const title = item["Název nože"] || "Artefakt";
+            const title = getItemName(item);
             const photos = getAllPhotos(item);
             const price = parsePrice(item);
+            const cat = getItemCategory(item);
 
             const card = document.createElement('div');
             card.className = 'item-card';
@@ -760,7 +785,7 @@
                 <div class="item-card-body">
                     <div class="item-card-code">${code.startsWith('#') ? code : '#' + code}</div>
                     <div class="item-card-title">${title}</div>
-                    <div class="item-card-meta">${item["Kategorie"] || "Bez kategorie"} ${price > 0 ? '• ' + price + ' Kč' : ''}</div>
+                    <div class="item-card-meta">${cat} ${price > 0 ? '• ' + price + ' Kč' : ''}</div>
                 </div>
             `;
 
@@ -787,19 +812,27 @@
         window.scrollTo(0, 0);
     }
 
+    function extractArrayFromData(data) {
+        if (Array.isArray(data)) return data;
+        if (typeof data === 'object' && data !== null) {
+            // Pokud obsahuje známé klíče jako "List 7", "List 1" atd.
+            const keys = Object.keys(data);
+            if (keys.length === 1 && typeof data[keys[0]] === 'object') {
+                return extractArrayFromData(data[keys[0]]);
+            }
+            // Změna objektu {"M-003": {...}, "M-045": {...}} na pole
+            return Object.keys(data).map(key => ({
+                _jsonKey: key,
+                ...data[key]
+            }));
+        }
+        return [];
+    }
+
     function initCatalog(data) {
         try {
-            const rawData = data["List 1"] ? data["List 1"] : data;
-            
-            if (Array.isArray(rawData)) {
-                allItems = rawData.map((item, idx) => ({ ...item, _originalIndex: idx }));
-            } else {
-                allItems = Object.keys(rawData).map((key, idx) => ({
-                    _jsonKey: key,
-                    _originalIndex: idx,
-                    ...rawData[key]
-                }));
-            }
+            const list = extractArrayFromData(data);
+            allItems = list.map((item, idx) => ({ ...item, _originalIndex: idx }));
             
             filteredItems = [...allItems];
             populateFilterDropdowns();
@@ -829,29 +862,34 @@
     function renderSelectedItem(item, index) {
         try {
             const code = getItemCode(item, parseInt(index));
-            document.getElementById('item-id').innerText = code.startsWith('#') ? code : "#" + code;
-            document.getElementById('item-title').innerText = item["Název nože"] || "Bez názvu";
-            document.getElementById('item-subtitle').innerText = (item["Výrobce nože/značka"] || "") + " • " + (item["Kategorie"] || "");
+            const name = getItemName(item);
+            const fullTitle = item["Název úplný"] || name;
+            const maker = item["Výrobce"] || item["Výrobce nože/značka"] || "";
+            const cat = getItemCategory(item);
 
-            document.getElementById('spec-steel').innerText = item["Mat. čepele"] || "-";
-            document.getElementById('spec-hrc').innerText = item["Tvrdost"] ? item["Tvrdost"] + " HRC" : "-";
-            document.getElementById('spec-construction').innerText = item["Druh zbraně"] || item["Typ zbraně"] || "-";
+            document.getElementById('item-id').innerText = code.startsWith('#') ? code : "#" + code;
+            document.getElementById('item-title').innerText = fullTitle;
+            document.getElementById('item-subtitle').innerText = maker + (maker && cat ? " • " : "") + cat;
+
+            document.getElementById('spec-steel').innerText = item["Mat. čepele / hlavní části"] || item["Mat. čepele"] || "-";
+            document.getElementById('spec-hrc').innerText = item["Tvrdost HRC"] || item["Tvrdost"] ? (item["Tvrdost HRC"] || item["Tvrdost"]) + " HRC" : "-";
+            document.getElementById('spec-construction').innerText = item["Konstrukce_typ"] || item["Druh zbraně"] || "-";
             document.getElementById('spec-origin').innerText = item["Země původu"] || "-";
 
             const price = parsePrice(item);
             document.getElementById('origin-price').innerText = price > 0 ? price + " Kč" : "-";
             document.getElementById('origin-country').innerText = item["Země získání"] || item["Země původu"] || "-";
-            document.getElementById('origin-place').innerText = item["Kde byl pořízen"] || "-";
-            document.getElementById('origin-expedition').innerText = item["Status ve sbírce"] || item["ID_Expedice"] || "-";
+            document.getElementById('origin-place').innerText = item["Místo_pořízení_detail"] || item["Kde byl pořízen"] || "-";
+            document.getElementById('origin-expedition').innerText = getItemCollection(item) || "-";
             document.getElementById('origin-year').innerText = formatDate(item["Datum pořízení"]);
 
-            document.getElementById('item-description').innerText = item["Popis"] || item["Krátký popis"] || "Bez popisu.";
+            document.getElementById('item-description').innerText = item["Detailní_popis_Příběh"] || item["Krátký_popis_specifikace"] || item["Popis"] || "Bez popisu.";
 
-            document.getElementById('tech-blade-len').innerText = item["Délka čepele cm"] ? item["Délka čepele cm"] + " cm" : "-";
-            document.getElementById('tech-blade-thick').innerText = item["Tloušťka čepeli mm"] ? item["Tloušťka čepeli mm"] + " mm" : "-";
-            document.getElementById('tech-total-len').innerText = item["Celková délka cm"] ? item["Celková délka cm"] + " cm" : "-";
-            document.getElementById('tech-handle').innerText = item["Mat.rukojeti"] || "-";
-            document.getElementById('tech-sheath').innerText = item["Pouzdro"] || "-";
+            document.getElementById('tech-blade-len').innerText = item["Délka čepele / délka hlavní části mm"] ? item["Délka čepele / délka hlavní části mm"] + " mm" : (item["Délka čepele cm"] ? item["Délka čepele cm"] + " cm" : "-");
+            document.getElementById('tech-blade-thick').innerText = item["Tloušťka čepele mm"] && !String(item["Tloušťka čepele mm"]).includes('T') ? item["Tloušťka čepele mm"] + " mm" : "-";
+            document.getElementById('tech-total-len').innerText = item["Celková délka mm"] ? item["Celková délka mm"] + " mm" : (item["Celková délka cm"] ? item["Celková délka cm"] + " cm" : "-");
+            document.getElementById('tech-handle').innerText = item["Mat. rukojeti / držadla"] || item["Mat.rukojeti"] || "-";
+            document.getElementById('tech-sheath').innerText = item["Pouzdro / pochva / obal"] || item["Pouzdro"] || "-";
             document.getElementById('tech-lock').innerText = item["Typ pojistky"] || "-";
 
             const mainImg = document.getElementById('hero-img');
@@ -904,7 +942,7 @@
         if (!currentSelectedItem) return;
         const code = getItemCode(currentSelectedItem, currentSelectedItem._originalIndex);
         const cleanId = code.replace(/[^0-9]/g, '');
-        const title = currentSelectedItem["Název nože"] || "Artefakt";
+        const title = getItemName(currentSelectedItem);
         
         document.getElementById('qr-code-text').innerText = code.startsWith('#') ? code : "#" + code;
         document.getElementById('qr-title').innerText = title;
@@ -933,7 +971,7 @@
         allItems.forEach((item, index) => {
             const code = getItemCode(item, index);
             const cleanId = code.replace(/[^0-9]/g, '');
-            const title = item["Název nože"] || "Artefakt";
+            const title = getItemName(item);
             const targetURL = "https://mirole04-ux.github.io/katalog/?id=" + cleanId;
 
             const card = document.createElement('div');
