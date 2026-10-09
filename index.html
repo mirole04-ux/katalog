@@ -95,13 +95,6 @@
             outline: none;
         }
 
-        .top-tools {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
         .btn-action {
             background-color: #2a2a2a;
             color: var(--accent-color);
@@ -119,7 +112,7 @@
             color: #000;
         }
 
-        /* Mřížka karet na úvodní obrazovce */
+        /* Mřížka karet */
         .items-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -143,11 +136,31 @@
             border-color: var(--accent-color);
         }
 
-        .item-card-img {
+        .item-card-img-wrap {
             width: 100%;
             height: 110px;
+            background: #1a1a1a;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .item-card-img {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            background: #000;
+            /* Schová rozbitý alt text z prohlížeče */
+            color: transparent;
+        }
+
+        .no-photo-placeholder {
+            font-size: 11px;
+            color: #555;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .item-card-body {
@@ -209,6 +222,7 @@
             height: 100%;
             object-fit: cover;
             transition: transform 0.3s;
+            color: transparent;
         }
 
         .image-container:hover img {
@@ -256,17 +270,8 @@
             z-index: 2;
         }
 
-        h1 {
-            font-size: 22px;
-            margin: 0 0 4px 0;
-            color: #ffffff;
-        }
-
-        .subtitle {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-        }
+        h1 { font-size: 22px; margin: 0 0 4px 0; color: #ffffff; }
+        .subtitle { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; }
 
         .grid-2 {
             display: grid;
@@ -282,17 +287,8 @@
             border-left: 3px solid var(--accent-color);
         }
 
-        .spec-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 2px;
-        }
-
-        .spec-value {
-            font-size: 14px;
-            font-weight: bold;
-        }
+        .spec-label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; }
+        .spec-value { font-size: 14px; font-weight: bold; }
 
         .section-title {
             font-size: 16px;
@@ -310,15 +306,8 @@
             font-size: 13px;
         }
 
-        .detail-label {
-            color: var(--text-muted);
-        }
-
-        .detail-value {
-            font-weight: 500;
-            text-align: right;
-            max-width: 60%;
-        }
+        .detail-label { color: var(--text-muted); }
+        .detail-value { font-weight: 500; text-align: right; max-width: 60%; }
 
         .description {
             font-size: 13.5px;
@@ -345,6 +334,7 @@
             border: 2px solid transparent;
             opacity: 0.7;
             transition: all 0.2s;
+            color: transparent;
         }
 
         .gallery-thumb.active, .gallery-thumb:hover {
@@ -451,27 +441,9 @@
             page-break-inside: avoid;
         }
 
-        .qr-card-code {
-            font-size: 14px;
-            font-weight: bold;
-            color: #000;
-            margin-bottom: 4px;
-        }
-
-        .qr-card-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: #333;
-            height: 32px;
-            overflow: hidden;
-            margin-bottom: 8px;
-        }
-
-        .qr-card-img {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 6px;
-        }
+        .qr-card-code { font-size: 14px; font-weight: bold; color: #000; margin-bottom: 4px; }
+        .qr-card-title { font-size: 12px; font-weight: 600; color: #333; height: 32px; overflow: hidden; margin-bottom: 8px; }
+        .qr-card-img { display: flex; justify-content: center; margin-bottom: 6px; }
 
         .print-actions {
             position: sticky;
@@ -533,14 +505,14 @@
         <div class="items-grid" id="items-grid"></div>
     </div>
 
-    <!-- DETAIL DETAIL NOŽE / ARTEFAKTU -->
+    <!-- DETAIL NOŽE / ARTEFAKTU -->
     <div id="detail-view" style="display: none;">
         <button class="back-btn" id="back-to-dashboard-btn" onclick="showDashboard()">← Zpět na přehled sbírky</button>
 
         <div class="image-container" onclick="openLightbox()">
             <span class="badge" id="item-id">#M-000</span>
             <button class="qr-btn" id="qr-btn" onclick="event.stopPropagation(); showQRCode();">QR Kód</button>
-            <img id="hero-img" src="https://via.placeholder.com/480x260?text=Načítání..." alt="Artefakt">
+            <img id="hero-img" src="" alt="">
             <div class="zoom-hint">🔍 Zvětšit fotku</div>
         </div>
 
@@ -591,12 +563,12 @@
     </div>
 </div>
 
-<!-- Lightbox pro detailní prohlížení fotek -->
+<!-- Lightbox -->
 <div id="lightbox-modal" onclick="closeLightbox()">
-    <img id="lightbox-img" src="" alt="Detail v plném rozlišení">
+    <img id="lightbox-img" src="" alt="">
 </div>
 
-<!-- Modal jednoho QR kódu -->
+<!-- Modal QR kód -->
 <div class="modal" id="qr-modal">
     <div class="modal-content">
         <h2 id="qr-code-text" style="margin:0; color:var(--accent-color);"></h2>
@@ -607,7 +579,7 @@
     </div>
 </div>
 
-<!-- Tiskový náhled všech štítků -->
+<!-- Tiskový náhled štítků -->
 <div id="print-view">
     <div class="print-actions">
         <button class="close-btn" onclick="window.print()">🖨️ Vytisknout / Uložit do PDF</button>
@@ -653,11 +625,9 @@
 
     function getItemCode(item, index) {
         if (!item) return "M-001";
-        
         if (item._jsonKey && !isNaN(item._jsonKey)) {
             return "M-" + String(item._jsonKey).padStart(3, '0');
         }
-        
         for (let key in item) {
             const cleanKey = key.toLowerCase().trim();
             if ((cleanKey.includes("kód") || cleanKey === "id" || cleanKey.includes("označení")) && !cleanKey.includes("expedice")) {
@@ -670,7 +640,6 @@
                 }
             }
         }
-        
         return "M-" + String(index + 1).padStart(3, '0');
     }
 
@@ -684,16 +653,6 @@
         if (item["Foto galérie"] && item["Foto galérie"] !== "null") {
             const gal = item["Foto galérie"].split(',').map(p => p.trim()).filter(p => p);
             photos.push(...gal);
-        }
-        if (photos.length === 0) {
-            for (let k in item) {
-                if (k.toLowerCase().includes("foto") || k.toLowerCase().includes("obrázek")) {
-                    if (item[k]) {
-                        photos = item[k].split(',').map(p => p.trim()).filter(p => p);
-                        break;
-                    }
-                }
-            }
         }
         return photos;
     }
@@ -709,7 +668,6 @@
             if (item["Kategorie"] && item["Kategorie"] !== "null") {
                 categories.add(item["Kategorie"].trim());
             }
-            
             const status = item["Status ve sbírce"];
             if (status && status !== "null") {
                 collections.add(status.trim());
@@ -753,7 +711,6 @@
             return matchesCategory && matchesCollection && matchesQuery;
         });
 
-        // Řazení výsledků
         filteredItems.sort((a, b) => {
             if (sortOption === "price-desc") return parsePrice(b) - parsePrice(a);
             if (sortOption === "price-asc") return parsePrice(a) - parsePrice(b);
@@ -761,7 +718,6 @@
             if (sortOption === "date-asc") return parseDate(a) - parseDate(b);
             if (sortOption === "name-asc") return (a["Název nože"] || "").localeCompare(b["Název nože"] || "");
             
-            // Základní kódové řazení (#M-001)
             const codeA = parseInt(getItemCode(a, a._originalIndex).replace(/[^0-9]/g, '')) || 0;
             const codeB = parseInt(getItemCode(b, b._originalIndex).replace(/[^0-9]/g, '')) || 0;
             return codeA - codeB;
@@ -778,7 +734,7 @@
         stats.innerText = `Zobrazeno ${filteredItems.length} z celkem ${allItems.length} nožů`;
 
         if (filteredItems.length === 0) {
-            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #888; padding: 30px;">Zadanému filtru neodpovídá žádný artefakt.</div>';
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #888; padding: 30px;">Žádný artefakt neodpovídá filtru.</div>';
             return;
         }
 
@@ -786,15 +742,21 @@
             const code = getItemCode(item, item._originalIndex);
             const title = item["Název nože"] || "Artefakt";
             const photos = getAllPhotos(item);
-            const imgSrc = photos.length > 0 ? photos[0] : "https://via.placeholder.com/200x120?text=Bez+fotky";
             const price = parsePrice(item);
 
             const card = document.createElement('div');
             card.className = 'item-card';
             card.onclick = () => showDetail(item._originalIndex);
 
+            let imgHTML = '';
+            if (photos.length > 0) {
+                imgHTML = `<img class="item-card-img" src="${photos[0]}" onerror="this.onerror=null; this.parentNode.innerHTML='<span class=\\'no-photo-placeholder\\'>Bez fotky</span>';" alt="">`;
+            } else {
+                imgHTML = `<span class="no-photo-placeholder">Bez fotky</span>`;
+            }
+
             card.innerHTML = `
-                <img class="item-card-img" src="${imgSrc}" alt="${title}">
+                <div class="item-card-img-wrap">${imgHTML}</div>
                 <div class="item-card-body">
                     <div class="item-card-code">${code.startsWith('#') ? code : '#' + code}</div>
                     <div class="item-card-title">${title}</div>
@@ -809,8 +771,6 @@
     function showDashboard() {
         document.getElementById('dashboard-view').style.display = 'block';
         document.getElementById('detail-view').style.display = 'none';
-        
-        // Vyčištění URL parametru id při návratu na přehled
         if (window.history && window.history.replaceState) {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -845,7 +805,6 @@
             populateFilterDropdowns();
             renderDashboardGrid();
 
-            // Kontrola QR kódu v URL (?id=...)
             const urlParams = new URLSearchParams(window.location.search);
             const reqId = urlParams.get('id');
 
@@ -858,7 +817,6 @@
 
                 if (foundIndex !== -1) {
                     showDetail(foundIndex);
-                    // Poptávka přes QR kód skryje tlačítko zpět, aby byla čistá public karta
                     document.getElementById('back-to-dashboard-btn').style.display = 'none';
                     document.getElementById('qr-btn').style.display = 'none';
                 }
@@ -902,7 +860,7 @@
             if (photosList.length > 0) {
                 mainImg.src = photosList[0];
             } else {
-                mainImg.src = "https://via.placeholder.com/480x260?text=Bez+fotografie";
+                mainImg.src = "";
             }
 
             const gallerySec = document.getElementById('gallery-section');
@@ -932,7 +890,7 @@
 
     function openLightbox() {
         const mainImgSrc = document.getElementById('hero-img').src;
-        if (mainImgSrc && !mainImgSrc.includes('placeholder')) {
+        if (mainImgSrc && mainImgSrc !== window.location.href) {
             document.getElementById('lightbox-img').src = mainImgSrc;
             document.getElementById('lightbox-modal').style.display = 'flex';
         }
