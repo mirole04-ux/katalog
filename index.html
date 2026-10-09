@@ -434,25 +434,30 @@
         return raw;
     }
 
-    function getItemCode(item, index) {
-        if (!item) return "M-001";
-        for (let key in item) {
-            const cleanKey = key.toLowerCase().trim();
-            if (cleanKey.includes("id") || cleanKey.includes("kód") || cleanKey.includes("označení")) {
-                if (item[key] && item[key] !== "null") {
-                    let val = String(item[key]).trim();
-                    if (!val.startsWith("M-") && !isNaN(val)) {
-                        val = "M-" + val.padStart(3, '0');
-                    }
-                    return val;
+function getItemCode(item, index) {
+    if (!item) return "M-001";
+    
+    // 1. Upřednostnit přímý klíč položky v JSONu (_jsonKey)
+    if (item._jsonKey && !isNaN(item._jsonKey)) {
+        return "M-" + String(item._jsonKey).padStart(3, '0');
+    }
+    
+    // 2. Prohledat konkrétní pole označení (ale přeskočit expedice)
+    for (let key in item) {
+        const cleanKey = key.toLowerCase().trim();
+        if ((cleanKey.includes("kód") || cleanKey === "id" || cleanKey.includes("označení")) && !cleanKey.includes("expedice")) {
+            if (item[key] && item[key] !== "null") {
+                let val = String(item[key]).trim();
+                if (!val.startsWith("M-") && !isNaN(val)) {
+                    val = "M-" + val.padStart(3, '0');
                 }
+                return val;
             }
         }
-        if (item._jsonKey) {
-            return "M-" + String(item._jsonKey).padStart(3, '0');
-        }
-        return "M-" + String(index + 1).padStart(3, '0');
     }
+    
+    return "M-" + String(index + 1).padStart(3, '0');
+}
 
     function getAllPhotos(item) {
         let photos = [];
