@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Katalog Artefaktů</title>
+    
+    <!-- PWA Registrace a Barva lišty -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffb703">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
@@ -663,116 +668,107 @@
         return item["Status ve sbírce"] || "";
     }
 
-function getAllPhotos(item) {
-    let photos = [];
-    if (!item) return photos;
+    function getAllPhotos(item) {
+        let photos = [];
+        if (!item) return photos;
 
-    // 1. Zkontrolovat, zda je fotka zadaná ručně v JSONu
-    const mainPhotoKeys = ["Foto hlavní", "Fotky (Galerie)", "Foto", "Obrázek"];
-    for (let k of mainPhotoKeys) {
-        if (item[k] && item[k] !== "null") {
-            const parts = String(item[k]).split(',').map(p => p.trim()).filter(p => p);
-            photos.push(...parts);
+        const mainPhotoKeys = ["Foto hlavní", "Fotky (Galerie)", "Foto", "Obrázek"];
+        for (let k of mainPhotoKeys) {
+            if (item[k] && item[k] !== "null") {
+                const parts = String(item[k]).split(',').map(p => p.trim()).filter(p => p);
+                photos.push(...parts);
+            }
         }
+
+        if (item["Foto galérie"] && item["Foto galérie"] !== "null") {
+            const gal = String(item["Foto galérie"]).split(',').map(p => p.trim()).filter(p => p);
+            photos.push(...gal);
+        }
+
+        // Pokud fotky chybí, vygenerujeme cesty podle kódu: foto/M-003.jpg, foto/M-003a.jpg...
+        if (photos.length === 0) {
+            const code = getItemCode(item, item._originalIndex || 0).replace('#', '').trim();
+            photos.push(`foto/${code}.jpg`);
+            const suffixes = ['a', 'b', 'c', 'd'];
+            suffixes.forEach(suf => {
+                photos.push(`foto/${code}${suf}.jpg`);
+            });
+        }
+
+        return [...new Set(photos)];
     }
 
-    if (item["Foto galérie"] && item["Foto galérie"] !== "null") {
-        const gal = String(item["Foto galérie"]).split(',').map(p => p.trim()).filter(p => p);
-        photos.push(...gal);
-    }
+    function populateFilterDropdowns() {
+        const catSelect = document.getElementById('category-filter');
+        const colSelect = document.getElementById('collection-filter');
 
-    // 2. Pokud fotka v tabulce vyplněná není, vygenerovat cesty automaticky podle kódu (#M-003 -> foto/M-003.jpg)
-    if (photos.length === 0) {
-        const code = getItemCode(item, item._originalIndex || 0).replace('#', '').trim(); // např. M-003
-        
-        // Hlavní fotka
-        photos.push(`foto/${code}.jpg`);
-        
-        // Doplňkové fotky z galerie (a, b, c)
-        const suffixes = ['a', 'b', 'c', 'd'];
-        suffixes.forEach(suf => {
-            photos.push(`foto/${code}${suf}.jpg`);
+        const categories = new Set();
+        const collections = new Set();
+
+        allItems.forEach(item => {
+            const cat = getItemCategory(item);
+            if (cat && cat !== "Bez kategorie") categories.add(cat);
+
+            const rawCol = getItemCollection(item);
+            if (rawCol) {
+                const parts = rawCol.split(/[,/;\n]+/).map(c => c.trim()).filter(c => c);
+                parts.forEach(c => collections.add(c));
+            }
+        });
+
+        catSelect.innerHTML = '<option value="">Všechny kategorie</option>';
+        Array.from(categories).sort().forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.innerText = cat;
+            catSelect.appendChild(opt);
+        });
+
+        colSelect.innerHTML = '<option value="">Všechny kolekce</option>';
+        Array.from(collections).sort().forEach(col => {
+            const opt = document.createElement('option');
+            opt.value = col;
+            opt.innerText = col;
+            colSelect.appendChild(opt);
         });
     }
 
-    return [...new Set(photos)];
-}
+    function filterItems() {
+        const query = document.getElementById('search-input').value.toLowerCase().trim();
+        const category = document.getElementById('category-filter').value;
+        const selectedCollection = document.getElementById('collection-filter').value.toLowerCase().trim();
+        const sortOption = document.getElementById('sort-select').value;
 
-function populateFilterDropdowns() {
-    const catSelect = document.getElementById('category-filter');
-    const colSelect = document.getElementById('collection-filter');
+        filteredItems = allItems.filter(item => {
+            const matchesCategory = !category || getItemCategory(item) === category;
+            
+            const itemCol = getItemCollection(item).toLowerCase();
+            const matchesCollection = !selectedCollection || itemCol.includes(selectedCollection);
+            
+            const name = getItemName(item).toLowerCase();
+            const steel = (item["Mat. čepele / hlavní části"] || item["Mat. čepele"] || "").toLowerCase();
+            const maker = (item["Výrobce"] || item["Výrobce nože/značka"] || "").toLowerCase();
+            const desc = (item["Detailní_popis_Příběh"] || item["Popis"] || "").toLowerCase();
 
-    const categories = new Set();
-    const collections = new Set();
+            const matchesQuery = !query || name.includes(query) || steel.includes(query) || maker.includes(query) || desc.includes(query);
 
-    allItems.forEach(item => {
-        // Kategorie
-        const cat = getItemCategory(item);
-        if (cat && cat !== "Bez kategorie") categories.add(cat);
+            return matchesCategory && matchesCollection && matchesQuery;
+        });
 
-        // Kolekce - rozdělení podle čárky, lomu nebo středníku
-        const rawCol = getItemCollection(item);
-        if (rawCol) {
-            // Rozdělí např. "Severská, Cestovní / Dárky" na jednotlivá slova
-            const parts = rawCol.split(/[,/;\n]+/).map(c => c.trim()).filter(c => c);
-            parts.forEach(c => collections.add(c));
-        }
-    });
+        filteredItems.sort((a, b) => {
+            if (sortOption === "price-desc") return parsePrice(b) - parsePrice(a);
+            if (sortOption === "price-asc") return parsePrice(a) - parsePrice(b);
+            if (sortOption === "date-desc") return parseDate(b) - parseDate(a);
+            if (sortOption === "date-asc") return parseDate(a) - parseDate(b);
+            if (sortOption === "name-asc") return getItemName(a).localeCompare(getItemName(b));
+            
+            const codeA = parseInt(getItemCode(a, a._originalIndex).replace(/[^0-9]/g, '')) || 0;
+            const codeB = parseInt(getItemCode(b, b._originalIndex).replace(/[^0-9]/g, '')) || 0;
+            return codeA - codeB;
+        });
 
-    catSelect.innerHTML = '<option value="">Všechny kategorie</option>';
-    Array.from(categories).sort().forEach(cat => {
-        const opt = document.createElement('option');
-        opt.value = cat;
-        opt.innerText = cat;
-        catSelect.appendChild(opt);
-    });
-
-    colSelect.innerHTML = '<option value="">Všechny kolekce</option>';
-    Array.from(collections).sort().forEach(col => {
-        const opt = document.createElement('option');
-        opt.value = col;
-        opt.innerText = col;
-        colSelect.appendChild(opt);
-    });
-}
-
-function filterItems() {
-    const query = document.getElementById('search-input').value.toLowerCase().trim();
-    const category = document.getElementById('category-filter').value;
-    const selectedCollection = document.getElementById('collection-filter').value.toLowerCase().trim();
-    const sortOption = document.getElementById('sort-select').value;
-
-    filteredItems = allItems.filter(item => {
-        const matchesCategory = !category || getItemCategory(item) === category;
-        
-        // Kontrola kolekce: Zjistíme, zda řetězec kolekcí daného nože obsahuje vybranou kolekci
-        const itemCol = getItemCollection(item).toLowerCase();
-        const matchesCollection = !selectedCollection || itemCol.includes(selectedCollection);
-        
-        const name = getItemName(item).toLowerCase();
-        const steel = (item["Mat. čepele / hlavní části"] || item["Mat. čepele"] || "").toLowerCase();
-        const maker = (item["Výrobce"] || item["Výrobce nože/značka"] || "").toLowerCase();
-        const desc = (item["Detailní_popis_Příběh"] || item["Popis"] || "").toLowerCase();
-
-        const matchesQuery = !query || name.includes(query) || steel.includes(query) || maker.includes(query) || desc.includes(query);
-
-        return matchesCategory && matchesCollection && matchesQuery;
-    });
-
-    filteredItems.sort((a, b) => {
-        if (sortOption === "price-desc") return parsePrice(b) - parsePrice(a);
-        if (sortOption === "price-asc") return parsePrice(a) - parsePrice(b);
-        if (sortOption === "date-desc") return parseDate(b) - parseDate(a);
-        if (sortOption === "date-asc") return parseDate(a) - parseDate(b);
-        if (sortOption === "name-asc") return getItemName(a).localeCompare(getItemName(b));
-        
-        const codeA = parseInt(getItemCode(a, a._originalIndex).replace(/[^0-9]/g, '')) || 0;
-        const codeB = parseInt(getItemCode(b, b._originalIndex).replace(/[^0-9]/g, '')) || 0;
-        return codeA - codeB;
-    });
-
-    renderDashboardGrid();
-}
+        renderDashboardGrid();
+    }
 
     function renderDashboardGrid() {
         const grid = document.getElementById('items-grid');
@@ -839,12 +835,10 @@ function filterItems() {
     function extractArrayFromData(data) {
         if (Array.isArray(data)) return data;
         if (typeof data === 'object' && data !== null) {
-            // Pokud obsahuje známé klíče jako "List 7", "List 1" atd.
             const keys = Object.keys(data);
             if (keys.length === 1 && typeof data[keys[0]] === 'object') {
                 return extractArrayFromData(data[keys[0]]);
             }
-            // Změna objektu {"M-003": {...}, "M-045": {...}} na pole
             return Object.keys(data).map(key => ({
                 _jsonKey: key,
                 ...data[key]
@@ -1035,5 +1029,17 @@ function filterItems() {
             showError("Nelze načíst soubor katalog.json: " + err.message);
         });
 </script>
+
+<!-- Registrace Service Workeru pro PWA a offline provoz -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker zaregistrován!'))
+        .catch(err => console.log('Chyba registraci SW:', err));
+    });
+  }
+</script>
+
 </body>
 </html>
