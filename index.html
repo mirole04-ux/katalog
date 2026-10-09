@@ -341,22 +341,32 @@
         return item["Země původu"] || "-";
     }
 
-    // Pomocná funkce pro vytažení všech fotek (spojí Foto hlavní + Foto galérie nebo načte Foto)
+    // Funkce pro získání správného kódu (např. M-004)
+    function getItemCode(item, index) {
+        const possibleKeys = ["ID", "id", "Kód", "Kod", "Označení", "Oznaceni", "Číslo", "Cislo"];
+        for (let k of possibleKeys) {
+            if (item[k] && item[k] !== "null") {
+                return String(item[k]).trim();
+            }
+        }
+        if (item._jsonKey) {
+            return "M-" + String(item._jsonKey).padStart(3, '0');
+        }
+        return "M-" + String(index + 1).padStart(3, '0');
+    }
+
     function getAllPhotos(item) {
         let photos = [];
 
-        // 1. Pokud existuje "Foto hlavní"
         if (item["Foto hlavní"] && item["Foto hlavní"] !== "null") {
             photos.push(item["Foto hlavní"]);
         }
 
-        // 2. Pokud existuje "Foto galérie" (může obsahovat více fotek oddělených čárkou)
         if (item["Foto galérie"] && item["Foto galérie"] !== "null") {
             const gal = item["Foto galérie"].split(',').map(p => p.trim()).filter(p => p);
             photos.push(...gal);
         }
 
-        // 3. Pokud je v tabulce jen jeden sloupec "Foto", "Fotka" nebo "Obrázek"
         if (photos.length === 0) {
             const keys = Object.keys(item);
             for (let k of keys) {
@@ -373,13 +383,11 @@
     }
 
     function initCatalog(data) {
-        // Převod objektu (1, 2, 3...) nebo pole na pole prvků
         const rawData = data["List 1"] ? data["List 1"] : data;
         
         if (Array.isArray(rawData)) {
             allItems = rawData;
         } else {
-            // Pokud je to objekt {"1": {...}, "2": {...}}, převedeme na pole a uchováme původní klíč/ID
             allItems = Object.keys(rawData).map(key => {
                 return {
                     _jsonKey: key,
@@ -394,17 +402,20 @@
         allItems.forEach((item, index) => {
             const opt = document.createElement('option');
             opt.value = index;
-            const displayId = item._jsonKey || (index + 1);
-            const title = item["Název nože"] || "Artefakt #" + displayId;
-            opt.innerText = `${displayId}. ${title}`;
+            const code = getItemCode(item, index);
+            const title = item["Název nože"] || "Artefakt " + code;
+            opt.innerText = `${code} - ${title}`;
             select.appendChild(opt);
         });
 
-        // Načtení ID z URL (např. ?id=4)
         const urlParams = new URLSearchParams(window.location.search);
         const reqId = urlParams.get('id');
         if (reqId) {
-            const foundIndex = allItems.findIndex(item => String(item._jsonKey) === String(reqId) || String(allItems.indexOf(item) + 1) === String(reqId));
+            const foundIndex = allItems.findIndex((item, idx) => {
+                const code = getItemCode(item, idx).replace(/[^0-9]/g, '');
+                const searchId = reqId.replace(/[^0-9]/g, '');
+                return code === searchId || String(item._jsonKey) === String(reqId);
+            });
             if (foundIndex !== -1) {
                 select.value = foundIndex;
             }
@@ -419,8 +430,8 @@
         const item = allItems[index];
         if (!item) return;
 
-        const displayId = item._jsonKey || (parseInt(index) + 1);
-        document.getElementById('item-id').innerText = "#M-" + String(displayId).padStart(3, '0');
+        const code = getItemCode(item, parseInt(index));
+        document.getElementById('item-id').innerText = code.startsWith('#') ? code : "#" + code;
         document.getElementById('item-title').innerText = item["Název nože"] || "Bez názvu";
         document.getElementById('item-subtitle').innerText = (item["Výrobce nože/značka"] || "") + " • " + (item["Kategorie"] || "");
 
@@ -443,7 +454,6 @@
         document.getElementById('tech-sheath').innerText = item["Pouzdro"] || "-";
         document.getElementById('tech-lock').innerText = item["Typ pojistky"] || "-";
 
-        // Načtení fotek
         const mainImg = document.getElementById('hero-img');
         const photosList = getAllPhotos(item);
 
@@ -453,7 +463,6 @@
             mainImg.src = "https://via.placeholder.com/480x260?text=Bez+fotografie";
         }
 
-        // Zobrazení galerie
         const gallerySec = document.getElementById('gallery-section');
         const galleryGrid = document.getElementById('gallery-grid');
         galleryGrid.innerHTML = '';
@@ -480,13 +489,14 @@
         const select = document.getElementById('item-select');
         const index = select.value || 0;
         const item = allItems[index];
-        const displayId = item ? (item._jsonKey || (parseInt(index) + 1)) : 1;
+        const code = item ? getItemCode(item, parseInt(index)) : "M-001";
+        const cleanId = code.replace(/[^0-9]/g, '');
         const title = item ? item["Název nože"] : "Artefakt";
         
         document.getElementById('qr-title').innerText = title;
         document.getElementById('qrcode').innerHTML = '';
 
-        let targetURL = "https://mirole04-ux.github.io/katalog/?id=" + displayId;
+        let targetURL = "https://mirole04-ux.github.io/katalog/?id=" + cleanId;
         document.getElementById('qr-url-text').innerText = targetURL;
 
         new QRCode(document.getElementById("qrcode"), {
