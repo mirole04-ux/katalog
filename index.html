@@ -698,72 +698,81 @@ function getAllPhotos(item) {
     return [...new Set(photos)];
 }
 
-    function populateFilterDropdowns() {
-        const catSelect = document.getElementById('category-filter');
-        const colSelect = document.getElementById('collection-filter');
+function populateFilterDropdowns() {
+    const catSelect = document.getElementById('category-filter');
+    const colSelect = document.getElementById('collection-filter');
 
-        const categories = new Set();
-        const collections = new Set();
+    const categories = new Set();
+    const collections = new Set();
 
-        allItems.forEach(item => {
-            const cat = getItemCategory(item);
-            if (cat && cat !== "Bez kategorie") categories.add(cat);
+    allItems.forEach(item => {
+        // Kategorie
+        const cat = getItemCategory(item);
+        if (cat && cat !== "Bez kategorie") categories.add(cat);
 
-            const col = getItemCollection(item);
-            if (col) collections.add(col);
-        });
+        // Kolekce - rozdělení podle čárky, lomu nebo středníku
+        const rawCol = getItemCollection(item);
+        if (rawCol) {
+            // Rozdělí např. "Severská, Cestovní / Dárky" na jednotlivá slova
+            const parts = rawCol.split(/[,/;\n]+/).map(c => c.trim()).filter(c => c);
+            parts.forEach(c => collections.add(c));
+        }
+    });
 
-        catSelect.innerHTML = '<option value="">Všechny kategorie</option>';
-        Array.from(categories).sort().forEach(cat => {
-            const opt = document.createElement('option');
-            opt.value = cat;
-            opt.innerText = cat;
-            catSelect.appendChild(opt);
-        });
+    catSelect.innerHTML = '<option value="">Všechny kategorie</option>';
+    Array.from(categories).sort().forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.innerText = cat;
+        catSelect.appendChild(opt);
+    });
 
-        colSelect.innerHTML = '<option value="">Všechny kolekce</option>';
-        Array.from(collections).sort().forEach(col => {
-            const opt = document.createElement('option');
-            opt.value = col;
-            opt.innerText = col;
-            colSelect.appendChild(opt);
-        });
-    }
+    colSelect.innerHTML = '<option value="">Všechny kolekce</option>';
+    Array.from(collections).sort().forEach(col => {
+        const opt = document.createElement('option');
+        opt.value = col;
+        opt.innerText = col;
+        colSelect.appendChild(opt);
+    });
+}
 
-    function filterItems() {
-        const query = document.getElementById('search-input').value.toLowerCase().trim();
-        const category = document.getElementById('category-filter').value;
-        const collection = document.getElementById('collection-filter').value;
-        const sortOption = document.getElementById('sort-select').value;
+function filterItems() {
+    const query = document.getElementById('search-input').value.toLowerCase().trim();
+    const category = document.getElementById('category-filter').value;
+    const selectedCollection = document.getElementById('collection-filter').value.toLowerCase().trim();
+    const sortOption = document.getElementById('sort-select').value;
 
-        filteredItems = allItems.filter(item => {
-            const matchesCategory = !category || getItemCategory(item) === category;
-            const matchesCollection = !collection || getItemCollection(item) === collection;
-            
-            const name = getItemName(item).toLowerCase();
-            const steel = (item["Mat. čepele / hlavní části"] || item["Mat. čepele"] || "").toLowerCase();
-            const maker = (item["Výrobce"] || item["Výrobce nože/značka"] || "").toLowerCase();
-            const desc = (item["Detailní_popis_Příběh"] || item["Popis"] || "").toLowerCase();
+    filteredItems = allItems.filter(item => {
+        const matchesCategory = !category || getItemCategory(item) === category;
+        
+        // Kontrola kolekce: Zjistíme, zda řetězec kolekcí daného nože obsahuje vybranou kolekci
+        const itemCol = getItemCollection(item).toLowerCase();
+        const matchesCollection = !selectedCollection || itemCol.includes(selectedCollection);
+        
+        const name = getItemName(item).toLowerCase();
+        const steel = (item["Mat. čepele / hlavní části"] || item["Mat. čepele"] || "").toLowerCase();
+        const maker = (item["Výrobce"] || item["Výrobce nože/značka"] || "").toLowerCase();
+        const desc = (item["Detailní_popis_Příběh"] || item["Popis"] || "").toLowerCase();
 
-            const matchesQuery = !query || name.includes(query) || steel.includes(query) || maker.includes(query) || desc.includes(query);
+        const matchesQuery = !query || name.includes(query) || steel.includes(query) || maker.includes(query) || desc.includes(query);
 
-            return matchesCategory && matchesCollection && matchesQuery;
-        });
+        return matchesCategory && matchesCollection && matchesQuery;
+    });
 
-        filteredItems.sort((a, b) => {
-            if (sortOption === "price-desc") return parsePrice(b) - parsePrice(a);
-            if (sortOption === "price-asc") return parsePrice(a) - parsePrice(b);
-            if (sortOption === "date-desc") return parseDate(b) - parseDate(a);
-            if (sortOption === "date-asc") return parseDate(a) - parseDate(b);
-            if (sortOption === "name-asc") return getItemName(a).localeCompare(getItemName(b));
-            
-            const codeA = parseInt(getItemCode(a, a._originalIndex).replace(/[^0-9]/g, '')) || 0;
-            const codeB = parseInt(getItemCode(b, b._originalIndex).replace(/[^0-9]/g, '')) || 0;
-            return codeA - codeB;
-        });
+    filteredItems.sort((a, b) => {
+        if (sortOption === "price-desc") return parsePrice(b) - parsePrice(a);
+        if (sortOption === "price-asc") return parsePrice(a) - parsePrice(b);
+        if (sortOption === "date-desc") return parseDate(b) - parseDate(a);
+        if (sortOption === "date-asc") return parseDate(a) - parseDate(b);
+        if (sortOption === "name-asc") return getItemName(a).localeCompare(getItemName(b));
+        
+        const codeA = parseInt(getItemCode(a, a._originalIndex).replace(/[^0-9]/g, '')) || 0;
+        const codeB = parseInt(getItemCode(b, b._originalIndex).replace(/[^0-9]/g, '')) || 0;
+        return codeA - codeB;
+    });
 
-        renderDashboardGrid();
-    }
+    renderDashboardGrid();
+}
 
     function renderDashboardGrid() {
         const grid = document.getElementById('items-grid');
