@@ -1,0 +1,71 @@
+{
+  "name": "Katalog Artefaktů",
+  "short_name": "Katalog",
+  "description": "Osobní katalog a evidence artefaktů a nožů",
+  "start_url": "./Pustíme se do **Kroku 2: Převod katalogu na bleskovou PWA aplikaci** s offline mezipamětí.
+
+Vytvoříme dva nové soubory (`sw.js` a `manifest.json`) a přidáme jeden krátký skript do `index.html`.
+
+---
+
+### 1. Soubor `sw.js` (Service Worker)
+Vytvoř na GitHubu v kořenu repozitáře nový soubor s názvem **`sw.js`** a vlož do něj tento kód:
+
+```javascript
+const CACHE_NAME = 'katalog-artefaktu-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './katalog.json',
+  './manifest.json',
+  '[https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js](https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js)'
+];
+
+// Instalace a uložení základních souborů do mezipaměti
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS);
+    })
+  );
+  self.skipWaiting();
+});
+
+// Aktivace a vyčištění staré mezipaměti při aktualizaci
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+// Strategie Cache-First pro fotky a offline provoz
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        // Pokud je soubor v cache, vrátí se okamžitě
+        return cachedResponse;
+      }
+      // Pokud není v cache, stáhne se ze sítě a uloží pro příště
+      return fetch(event.request).then((networkResponse) => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
+        }
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+        return networkResponse;
+      });
+    })
+  );
+});
