@@ -35,8 +35,32 @@
             box-sizing: border-box;
         }
 
-        .select-container {
+        /* Vyhledávání a Filtry */
+        .filter-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
             margin-bottom: 12px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px;
+            background-color: #2a2a2a;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .select-container {
+            margin-bottom: 8px;
         }
 
         select {
@@ -46,7 +70,7 @@
             color: var(--text-color);
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            font-size: 16px;
+            font-size: 15px;
             outline: none;
         }
 
@@ -80,12 +104,30 @@
             overflow: hidden;
             position: relative;
             margin-bottom: 12px;
+            cursor: pointer;
         }
 
         .image-container img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transition: transform 0.3s;
+        }
+
+        .image-container:hover img {
+            transform: scale(1.03);
+        }
+
+        .zoom-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            pointer-events: none;
         }
 
         .badge {
@@ -99,6 +141,7 @@
             font-size: 12px;
             font-weight: bold;
             border: 1px solid var(--accent-color);
+            z-index: 2;
         }
 
         .qr-btn {
@@ -113,6 +156,7 @@
             cursor: pointer;
             font-size: 12px;
             font-weight: bold;
+            z-index: 2;
         }
 
         h1 {
@@ -231,6 +275,26 @@
             max-width: 80%;
         }
 
+        /* Lightbox - Zvětšené foto */
+        #lightbox-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+            cursor: zoom-out;
+        }
+
+        #lightbox-img {
+            max-width: 95%;
+            max-height: 90vh;
+            border-radius: 8px;
+            box-shadow: 0 0 25px rgba(0,0,0,0.8);
+            object-fit: contain;
+        }
+
         #qrcode {
             display: flex;
             justify-content: center;
@@ -336,18 +400,29 @@
 <div class="container">
     <div id="error-msg"></div>
 
-    <div class="select-container" id="select-box">
-        <select id="item-select" onchange="renderSelectedItem()"></select>
+    <!-- Výběr a Filtrování -->
+    <div id="admin-controls">
+        <div class="filter-panel">
+            <input type="text" id="search-input" class="search-input" placeholder="🔍 Hledat název, ocel, výrobce..." oninput="filterItems()">
+            <select id="category-filter" onchange="filterItems()">
+                <option value="">Všechny kategorie</option>
+            </select>
+        </div>
+
+        <div class="select-container">
+            <select id="item-select" onchange="renderSelectedItem()"></select>
+        </div>
+
+        <div class="top-tools" id="tools-box">
+            <button class="print-all-btn" onclick="openPrintView()">🖨️ Vytisknout všechny QR štítky</button>
+        </div>
     </div>
 
-    <div class="top-tools" id="tools-box">
-        <button class="print-all-btn" onclick="openPrintView()">🖨️ Vytisknout všechny QR štítky</button>
-    </div>
-
-    <div class="image-container">
+    <div class="image-container" onclick="openLightbox()">
         <span class="badge" id="item-id">#M-000</span>
-        <button class="qr-btn" id="qr-btn" onclick="showQRCode()">QR Kód</button>
+        <button class="qr-btn" id="qr-btn" onclick="event.stopPropagation(); showQRCode();">QR Kód</button>
         <img id="hero-img" src="https://via.placeholder.com/480x260?text=Načítání..." alt="Artefakt">
+        <div class="zoom-hint">🔍 Zvětšit fotku</div>
     </div>
 
     <h1 id="item-title">Načítání...</h1>
@@ -395,6 +470,11 @@
     <div class="detail-row"><span class="detail-label">Pojistka:</span><span class="detail-value" id="tech-lock">-</span></div>
 </div>
 
+<!-- Lightbox pro detailní prohlížení fotek -->
+<div id="lightbox-modal" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="Detail v plném rozlišení">
+</div>
+
 <!-- Modal jednoho QR kódu -->
 <div class="modal" id="qr-modal">
     <div class="modal-content">
@@ -418,6 +498,7 @@
 
 <script>
     let allItems = [];
+    let filteredItems = [];
 
     function showError(msg) {
         const err = document.getElementById('error-msg');
@@ -434,30 +515,28 @@
         return raw;
     }
 
-function getItemCode(item, index) {
-    if (!item) return "M-001";
-    
-    // 1. Upřednostnit přímý klíč položky v JSONu (_jsonKey)
-    if (item._jsonKey && !isNaN(item._jsonKey)) {
-        return "M-" + String(item._jsonKey).padStart(3, '0');
-    }
-    
-    // 2. Prohledat konkrétní pole označení (ale přeskočit expedice)
-    for (let key in item) {
-        const cleanKey = key.toLowerCase().trim();
-        if ((cleanKey.includes("kód") || cleanKey === "id" || cleanKey.includes("označení")) && !cleanKey.includes("expedice")) {
-            if (item[key] && item[key] !== "null") {
-                let val = String(item[key]).trim();
-                if (!val.startsWith("M-") && !isNaN(val)) {
-                    val = "M-" + val.padStart(3, '0');
+    function getItemCode(item, index) {
+        if (!item) return "M-001";
+        
+        if (item._jsonKey && !isNaN(item._jsonKey)) {
+            return "M-" + String(item._jsonKey).padStart(3, '0');
+        }
+        
+        for (let key in item) {
+            const cleanKey = key.toLowerCase().trim();
+            if ((cleanKey.includes("kód") || cleanKey === "id" || cleanKey.includes("označení")) && !cleanKey.includes("expedice")) {
+                if (item[key] && item[key] !== "null") {
+                    let val = String(item[key]).trim();
+                    if (!val.startsWith("M-") && !isNaN(val)) {
+                        val = "M-" + val.padStart(3, '0');
+                    }
+                    return val;
                 }
-                return val;
             }
         }
+        
+        return "M-" + String(index + 1).padStart(3, '0');
     }
-    
-    return "M-" + String(index + 1).padStart(3, '0');
-}
 
     function getAllPhotos(item) {
         let photos = [];
@@ -483,37 +562,91 @@ function getItemCode(item, index) {
         return photos;
     }
 
+    function populateCategories() {
+        const catSelect = document.getElementById('category-filter');
+        const categories = new Set();
+
+        allItems.forEach(item => {
+            if (item["Kategorie"] && item["Kategorie"] !== "null") {
+                categories.add(item["Kategorie"].trim());
+            }
+        });
+
+        catSelect.innerHTML = '<option value="">Všechny kategorie</option>';
+        Array.from(categories).sort().forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.innerText = cat;
+            catSelect.appendChild(opt);
+        });
+    }
+
+    function filterItems() {
+        const query = document.getElementById('search-input').value.toLowerCase().trim();
+        const category = document.getElementById('category-filter').value;
+
+        filteredItems = allItems.filter(item => {
+            const matchesCategory = !category || item["Kategorie"] === category;
+            
+            const name = (item["Název nože"] || "").toLowerCase();
+            const steel = (item["Mat. čepele"] || "").toLowerCase();
+            const maker = (item["Výrobce nože/značka"] || "").toLowerCase();
+            const desc = (item["Popis"] || "").toLowerCase();
+
+            const matchesQuery = !query || name.includes(query) || steel.includes(query) || maker.includes(query) || desc.includes(query);
+
+            return matchesCategory && matchesQuery;
+        });
+
+        updateSelectOptions();
+    }
+
+    function updateSelectOptions() {
+        const select = document.getElementById('item-select');
+        select.innerHTML = '';
+
+        if (filteredItems.length === 0) {
+            const opt = document.createElement('option');
+            opt.innerText = "Žádný artefakt neodpovídá filtru";
+            select.appendChild(opt);
+            return;
+        }
+
+        filteredItems.forEach((item) => {
+            const opt = document.createElement('option');
+            opt.value = item._originalIndex;
+            const code = getItemCode(item, item._originalIndex);
+            const title = item["Název nože"] || "Artefakt " + code;
+            opt.innerText = code + " - " + title;
+            select.appendChild(opt);
+        });
+
+        renderSelectedItem();
+    }
+
     function initCatalog(data) {
         try {
             const rawData = data["List 1"] ? data["List 1"] : data;
             
             if (Array.isArray(rawData)) {
-                allItems = rawData;
+                allItems = rawData.map((item, idx) => ({ ...item, _originalIndex: idx }));
             } else {
-                allItems = Object.keys(rawData).map(key => ({
+                allItems = Object.keys(rawData).map((key, idx) => ({
                     _jsonKey: key,
+                    _originalIndex: idx,
                     ...rawData[key]
                 }));
             }
             
-            const select = document.getElementById('item-select');
-            select.innerHTML = '';
-
-            allItems.forEach((item, index) => {
-                const opt = document.createElement('option');
-                opt.value = index;
-                const code = getItemCode(item, index);
-                const title = item["Název nože"] || "Artefakt " + code;
-                opt.innerText = code + " - " + title;
-                select.appendChild(opt);
-            });
+            filteredItems = [...allItems];
+            populateCategories();
+            updateSelectOptions();
 
             const urlParams = new URLSearchParams(window.location.search);
             const reqId = urlParams.get('id');
 
             if (reqId) {
-                document.getElementById('select-box').style.display = 'none';
-                document.getElementById('tools-box').style.display = 'none';
+                document.getElementById('admin-controls').style.display = 'none';
                 document.getElementById('qr-btn').style.display = 'none';
 
                 const foundIndex = allItems.findIndex((item, idx) => {
@@ -523,7 +656,7 @@ function getItemCode(item, index) {
                 });
 
                 if (foundIndex !== -1) {
-                    select.value = foundIndex;
+                    document.getElementById('item-select').value = foundIndex;
                 }
             }
 
@@ -536,7 +669,9 @@ function getItemCode(item, index) {
     function renderSelectedItem() {
         try {
             const select = document.getElementById('item-select');
-            const index = select.value || 0;
+            const index = select.value;
+            if (index === undefined || index === null || index === "") return;
+
             const item = allItems[index];
             if (!item) return;
 
@@ -596,6 +731,18 @@ function getItemCode(item, index) {
         } catch(e) {
             showError("Chyba při vykreslení položky: " + e.message);
         }
+    }
+
+    function openLightbox() {
+        const mainImgSrc = document.getElementById('hero-img').src;
+        if (mainImgSrc && !mainImgSrc.includes('placeholder')) {
+            document.getElementById('lightbox-img').src = mainImgSrc;
+            document.getElementById('lightbox-modal').style.display = 'flex';
+        }
+    }
+
+    function closeLightbox() {
+        document.getElementById('lightbox-modal').style.display = 'none';
     }
 
     function showQRCode() {
