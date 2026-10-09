@@ -311,7 +311,7 @@
         }
 
         .detail-label { color: var(--text-muted); }
-        .detail-value { font-weight: 500; text-align: right; max-width: 60%; }
+        .detail-value { font-weight: 500; text-align: right; max-width: 60%; word-break: break-word; }
 
         .description {
             font-size: 13.5px;
@@ -564,6 +564,17 @@
         <div class="detail-row"><span class="detail-label">Rukojeť:</span><span class="detail-value" id="tech-handle">-</span></div>
         <div class="detail-row"><span class="detail-label">Pouzdro:</span><span class="detail-value" id="tech-sheath">-</span></div>
         <div class="detail-row"><span class="detail-label">Pojistka:</span><span class="detail-value" id="tech-lock">-</span></div>
+
+        <!-- Rozkládací kompletní pasport ze všech polí tabulky -->
+        <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+            <button class="btn-action" style="width: 100%; padding: 12px; font-size: 14px;" onclick="toggleFullPassport()">
+                📋 Zobrazit / Skrýt kompletní data z tabulky
+            </button>
+            <div id="full-passport-container" style="display: none; margin-top: 15px; background: #181818; padding: 12px; border-radius: 8px; border: 1px solid #333;">
+                <div class="section-title" style="margin-top:0;">Kompletní pasport artefaktu</div>
+                <div id="full-passport-rows"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -685,7 +696,7 @@
             photos.push(...gal);
         }
 
-        // Pokud fotky chybí, vygenerujeme cesty podle kódu: foto/M-003.jpg, foto/M-003a.jpg...
+        // Automatické cestovní rozhraní podle kódu: foto/M-003.jpg, foto/M-003a.jpg...
         if (photos.length === 0) {
             const code = getItemCode(item, item._originalIndex || 0).replace('#', '').trim();
             photos.push(`foto/${code}.jpg`);
@@ -877,6 +888,36 @@
         }
     }
 
+    function toggleFullPassport() {
+        const container = document.getElementById('full-passport-container');
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    function renderFullPassport(item) {
+        const passportGrid = document.getElementById('full-passport-rows');
+        passportGrid.innerHTML = '';
+
+        for (let key in item) {
+            if (key.startsWith('_') || item[key] === null || item[key] === undefined || item[key] === "" || item[key] === "null") continue;
+
+            let val = item[key];
+            if (typeof val === 'string' && val.includes('T') && val.endsWith('Z')) {
+                val = formatDate(val);
+            }
+
+            const row = document.createElement('div');
+            row.className = 'detail-row';
+            row.style.fontSize = '12px';
+            row.innerHTML = `<span class="detail-label" style="color: var(--accent-color);">${key}:</span><span class="detail-value">${val}</span>`;
+            
+            passportGrid.appendChild(row);
+        }
+    }
+
     function renderSelectedItem(item, index) {
         try {
             const code = getItemCode(item, parseInt(index));
@@ -939,6 +980,10 @@
             } else {
                 gallerySec.style.display = 'none';
             }
+
+            // Vykreslení kompletního pasportu ze všech polí v JSONu
+            renderFullPassport(item);
+
         } catch(e) {
             showError("Chyba při vykreslení položky: " + e.message);
         }
