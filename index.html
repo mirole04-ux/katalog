@@ -228,13 +228,14 @@
             margin-top: 10px;
         }
 
-        #loader-box {
+        #error-msg {
             display: none;
-            margin-top: 15px;
+            margin-bottom: 15px;
             padding: 12px;
-            background: #2b1f00;
-            border: 1px solid var(--accent-color);
+            background: #4a1212;
+            border: 1px solid #ff4d4d;
             border-radius: 6px;
+            color: #ffcccc;
             font-size: 13px;
         }
     </style>
@@ -242,6 +243,8 @@
 <body>
 
 <div class="container">
+    <div id="error-msg"></div>
+
     <div class="select-container">
         <select id="item-select" onchange="renderSelectedItem()"></select>
     </div>
@@ -295,11 +298,6 @@
     <div class="detail-row"><span class="detail-label">Rukojeť:</span><span class="detail-value" id="tech-handle">-</span></div>
     <div class="detail-row"><span class="detail-label">Pouzdro:</span><span class="detail-value" id="tech-sheath">-</span></div>
     <div class="detail-row"><span class="detail-label">Pojistka:</span><span class="detail-value" id="tech-lock">-</span></div>
-
-    <div id="loader-box">
-        Vyber soubor katalog.json ručně: <br><br>
-        <input type="file" id="json-file-input" accept=".json">
-    </div>
 </div>
 
 <div class="modal" id="qr-modal">
@@ -314,6 +312,12 @@
 <script>
     let allItems = [];
 
+    function showError(msg) {
+        const err = document.getElementById('error-msg');
+        err.style.display = 'block';
+        err.innerHTML = '<strong>Chyba:</strong> ' + msg;
+    }
+
     function formatDate(raw) {
         if (!raw) return "-";
         if (typeof raw === 'string' && raw.includes('T')) {
@@ -324,9 +328,9 @@
     }
 
     function getItemCode(item, index) {
-        // Prohledá klíče tabulky jako ID, Kód, Označení nože atd.
+        if (!item) return "M-001";
         for (let key in item) {
-            const cleanKey = key.toLowerCase();
+            const cleanKey = key.toLowerCase().trim();
             if (cleanKey.includes("id") || cleanKey.includes("kód") || cleanKey.includes("označení")) {
                 if (item[key] && item[key] !== "null") {
                     return String(item[key]).trim();
@@ -341,6 +345,8 @@
 
     function getAllPhotos(item) {
         let photos = [];
+        if (!item) return photos;
+
         if (item["Foto hlavní"] && item["Foto hlavní"] !== "null") {
             photos.push(item["Foto hlavní"]);
         }
@@ -362,103 +368,111 @@
     }
 
     function initCatalog(data) {
-        const rawData = data["List 1"] ? data["List 1"] : data;
-        
-        if (Array.isArray(rawData)) {
-            allItems = rawData;
-        } else {
-            allItems = Object.keys(rawData).map(key => ({
-                _jsonKey: key,
-                ...rawData[key]
-            }));
-        }
-        
-        const select = document.getElementById('item-select');
-        select.innerHTML = '';
-
-        allItems.forEach((item, index) => {
-            const opt = document.createElement('option');
-            opt.value = index;
-            const code = getItemCode(item, index);
-            const title = item["Název nože"] || "Artefakt " + code;
-            opt.innerText = code + " - " + title;
-            select.appendChild(opt);
-        });
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const reqId = urlParams.get('id');
-        if (reqId) {
-            const foundIndex = allItems.findIndex((item, idx) => {
-                const code = getItemCode(item, idx).replace(/[^0-9]/g, '');
-                const searchId = reqId.replace(/[^0-9]/g, '');
-                return code === searchId || String(item._jsonKey) === String(reqId);
-            });
-            if (foundIndex !== -1) {
-                select.value = foundIndex;
+        try {
+            const rawData = data["List 1"] ? data["List 1"] : data;
+            
+            if (Array.isArray(rawData)) {
+                allItems = rawData;
+            } else {
+                allItems = Object.keys(rawData).map(key => ({
+                    _jsonKey: key,
+                    ...rawData[key]
+                }));
             }
-        }
+            
+            const select = document.getElementById('item-select');
+            select.innerHTML = '';
 
-        renderSelectedItem();
+            allItems.forEach((item, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                const code = getItemCode(item, index);
+                const title = item["Název nože"] || "Artefakt " + code;
+                opt.innerText = code + " - " + title;
+                select.appendChild(opt);
+            });
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const reqId = urlParams.get('id');
+            if (reqId) {
+                const foundIndex = allItems.findIndex((item, idx) => {
+                    const code = getItemCode(item, idx).replace(/[^0-9]/g, '');
+                    const searchId = reqId.replace(/[^0-9]/g, '');
+                    return code === searchId || String(item._jsonKey) === String(reqId);
+                });
+                if (foundIndex !== -1) {
+                    select.value = foundIndex;
+                }
+            }
+
+            renderSelectedItem();
+        } catch(e) {
+            showError("Chyba při zpracování dat: " + e.message);
+        }
     }
 
     function renderSelectedItem() {
-        const select = document.getElementById('item-select');
-        const index = select.value || 0;
-        const item = allItems[index];
-        if (!item) return;
+        try {
+            const select = document.getElementById('item-select');
+            const index = select.value || 0;
+            const item = allItems[index];
+            if (!item) return;
 
-        const code = getItemCode(item, parseInt(index));
-        document.getElementById('item-id').innerText = code.startsWith('#') ? code : "#" + code;
-        document.getElementById('item-title').innerText = item["Název nože"] || "Bez názvu";
-        document.getElementById('item-subtitle').innerText = (item["Výrobce nože/značka"] || "") + " • " + (item["Kategorie"] || "");
+            const code = getItemCode(item, parseInt(index));
+            document.getElementById('item-id').innerText = code.startsWith('#') ? code : "#" + code;
+            document.getElementById('item-title').innerText = item["Název nože"] || "Bez názvu";
+            document.getElementById('item-subtitle').innerText = (item["Výrobce nože/značka"] || "") + " • " + (item["Kategorie"] || "");
 
-        document.getElementById('spec-steel').innerText = item["Mat. čepele"] || "-";
-        document.getElementById('spec-hrc').innerText = item["Tvrdost"] ? item["Tvrdost"] + " HRC" : "-";
-        document.getElementById('spec-construction').innerText = item["Druh zbraně"] || item["Typ zbraně"] || "-";
-        document.getElementById('spec-origin').innerText = item["Země původu"] || "-";
+            document.getElementById('spec-steel').innerText = item["Mat. čepele"] || "-";
+            document.getElementById('spec-hrc').innerText = item["Tvrdost"] ? item["Tvrdost"] + " HRC" : "-";
+            document.getElementById('spec-construction').innerText = item["Druh zbraně"] || item["Typ zbraně"] || "-";
+            document.getElementById('spec-origin').innerText = item["Země původu"] || "-";
 
-        document.getElementById('origin-country').innerText = item["Země získání"] || item["Země původu"] || "-";
-        document.getElementById('origin-place').innerText = item["Kde byl pořízen"] || "-";
-        document.getElementById('origin-expedition').innerText = item["Status ve sbírce"] || item["ID_Expedice"] || "-";
-        document.getElementById('origin-year').innerText = formatDate(item["Datum pořízení"]);
+            document.getElementById('origin-country').innerText = item["Země získání"] || item["Země původu"] || "-";
+            document.getElementById('origin-place').innerText = item["Kde byl pořízen"] || "-";
+            document.getElementById('origin-expedition').innerText = item["Status ve sbírce"] || item["ID_Expedice"] || "-";
+            document.getElementById('origin-year').innerText = formatDate(item["Datum pořízení"]);
 
-        document.getElementById('item-description').innerText = item["Popis"] || item["Krátký popis"] || "Bez popisu.";
+            document.getElementById('item-description').innerText = item["Popis"] || item["Krátký popis"] || "Bez popisu.";
 
-        document.getElementById('tech-blade-len').innerText = item["Délka čepele cm"] ? item["Délka čepele cm"] + " cm" : "-";
-        document.getElementById('tech-blade-thick').innerText = item["Tloušťka čepeli mm"] ? item["Tloušťka čepeli mm"] + " mm" : "-";
-        document.getElementById('tech-total-len').innerText = item["Celková délka cm"] ? item["Celková délka cm"] + " cm" : "-";
-        document.getElementById('tech-handle').innerText = item["Mat.rukojeti"] || "-";
-        document.getElementById('tech-sheath').innerText = item["Pouzdro"] || "-";
-        document.getElementById('tech-lock').innerText = item["Typ pojistky"] || "-";
+            document.getElementById('tech-blade-len').innerText = item["Délka čepele cm"] ? item["Délka čepele cm"] + " cm" : "-";
+            document.getElementById('tech-blade-thick').innerText = item["Tloušťka čepeli mm"] ? item["Tloušťka čepeli mm"] + " mm" : "-";
+            document.getElementById('tech-total-len').innerText = item["Celková délka cm"] ? item["Celková délka cm"] + " cm" : "-";
+            document.getElementById('tech-handle').innerText = item["Mat.rukojeti"] || "-";
+            document.getElementById('tech-sheath').innerText = item["Pouzdro"] || "-";
+            document.getElementById('tech-lock').innerText = item["Typ pojistky"] || "-";
 
-        const mainImg = document.getElementById('hero-img');
-        const photosList = getAllPhotos(item);
+            const mainImg = document.getElementById('hero-img');
+            const photosList = getAllPhotos(item);
 
-        if (photosList.length > 0) {
-            mainImg.src = photosList[0];
-        } else {
-            mainImg.src = "https://via.placeholder.com/480x260?text=Bez+fotografie";
-        }
+            if (photosList.length > 0) {
+                mainImg.src = photosList[0];
+            } else {
+                mainImg.src = "https://via.placeholder.com/480x260?text=Bez+fotografie";
+            }
 
-        const gallerySec = document.getElementById('gallery-section');
-        const galleryGrid = document.getElementById('gallery-grid');
-        galleryGrid.innerHTML = '';
+            const gallerySec = document.getElementById('gallery-section');
+            const galleryGrid = document.getElementById('gallery-grid');
+            galleryGrid.innerHTML = '';
 
-        if (photosList.length > 1) {
-            gallerySec.style.display = 'block';
-            photosList.forEach((src, idx) => {
-                const img = document.createElement('img');
-                img.src = src;
-                img.className = 'gallery-thumb' + (idx === 0 ? ' active' : '');
-                img.onclick = function() {
-                    mainImg.src = src;
-                    document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
-                    img.classList.add('active');
-                };
-                galleryGrid.appendChild(img);
-            });
-        } else {
-            gallerySec.style.display = 'none';
+            if (photosList.length > 1) {
+                gallerySec.style.display = 'block';
+                photosList.forEach((src, idx) => {
+                    const img = document.createElement('img');
+                    img.src = src;
+                    img.className = 'gallery-thumb' + (idx === 0 ? ' active' : '');
+                    img.onclick = function() {
+                        mainImg.src = src;
+                        document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+                        img.classList.add('active');
+                    };
+                    galleryGrid.appendChild(img);
+                });
+            } else {
+                gallerySec.style.display = 'none';
+            }
+        } catch(e) {
+            showError("Chyba při vykreslení položky: " + e.message);
         }
     }
 
@@ -490,22 +504,14 @@
     }
 
     fetch('katalog.json')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error("Soubor katalog.json nebyl nalezen (HTTP " + res.status + ")");
+            return res.json();
+        })
         .then(data => initCatalog(data))
-        .catch(() => {
-            document.getElementById('loader-box').style.display = 'block';
+        .catch(err => {
+            showError("Nelze načíst soubor katalog.json: " + err.message);
         });
-
-    document.getElementById('json-file-input').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-            initCatalog(JSON.parse(evt.target.result));
-            document.getElementById('loader-box').style.display = 'none';
-        };
-        reader.readAsText(file);
-    });
 </script>
 </body>
 </html>
