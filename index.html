@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Katalog zbraní</title>
+    
+    <!-- PWA Registrace a Barva lišty -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffb703">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <!-- Leaflet CSS & JS pro interaktivní mapu -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-color: #ffb703;
+            --danger-color: #ff4d4d;
+            --success-color: #2ec4b6;
+            --text-color: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border-color: #333333;
+            --base-font-size: 14px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: var(--base-font-size);
+            margin: 0;
+            padding: 12px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* Dashboard & Hlavička */
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+            position: relative;
+            min-height: 40px;
+        }
+
+        .header-menu-left {
+            position: absolute;
+            top: 2px;
+            left: 0;
+            z-index: 10;
+        }
+
+        .settings-btn-right {
+            position: absolute;
+            top: 2px;
+            right: 0;
+            z-index: 10;
+        }
+
+        .icon-btn-round {
+            background: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: var(--accent-color);
+            padding: 6px 10px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: border-color 0.2s;
+        }
+        .icon-btn-round:hover {
+            border-color: var(--accent-color);
+        }
+
+        .dashboard-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin: 0 0 2px 0;
+            padding-top: 4px;
+        }
+
+        .dashboard-stats {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .filter-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px;
+            background-color: #2a2a2a;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px 10px;
+            background-color: #2a2a2a;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .btn-action {
+            background-color: #2a2a2a;
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .btn-action:hover {
+            background-color: var(--accent-color);
+            color: #000;
+        }
+
+        /* Dynamická mřížka karet */
+        .items-grid {
+            display: grid;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .items-grid.cols-1 { grid-template-columns: 1fr; }
+        .items-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+        .items-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .items-grid.cols-list { grid-template-columns: 1fr; }
+
+        .item-card {
+            background: #262626;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .items-grid.cols-list .item-card {
+            flex-direction: row;
+            align-items: center;
+            padding: 6px;
+        }
+        .items-grid.cols-list .item-card-img-wrap {
+            width: 60px;
+            height: 60px;
+            flex-shrink: 0;
+            border-radius: 4px;
+        }
+        .items-grid.cols-list .item-card-body {
+            padding: 4px 8px;
+        }
+
+        .item-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-color);
+        }
+
+        .item-card-img-wrap {
+            width: 100%;
+            height: 110px;
+            background: #151515;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .item-card-img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            color: transparent;
+            opacity: 1 !important;
+            filter: none !important;
+            mix-blend-mode: normal;
+        }
+
+        .no-photo-placeholder {
+            font-size: 11px;
+            color: #555;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .service-dot {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 10px;
+            height: 10px;
+            background-color: var(--danger-color);
+            border-radius: 50%;
+            box-shadow: 0 0 6px rgba(255, 77, 77, 0.9);
+            z-index: 5;
+        }
+
+        .item-card-body {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .item-card-code {
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 2px;
+        }
+
+        .item-card-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--text-color);
+            line-height: 1.3;
+            margin-bottom: 4px;
+        }
+
+        .item-card-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: auto;
+        }
+
+        /* Detail Artefaktu */
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--accent-color);
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 0;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .image-container {
+            width: 100%;
+            height: 260px;
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-container img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: transform 0.3s;
+            color: transparent;
+            opacity: 1 !important;
+            filter: none !important;
+            mix-blend-mode: normal;
+        }
+
+        .image-container:hover img {
+            transform: scale(1.03);
+        }
+
+        .zoom-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            pointer-events: none;
+        }
+
+        .badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0,0,0,0.7);
+            color: var(--accent-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            border: 1px solid var(--accent-color);
+            z-index: 2;
+        }
+
+        .qr-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0,0,0,0.7);
+            color: #fff;
+            border: 1px solid var(--accent-color);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 2;
+        }
+
+        h1 { font-size: 22px; margin: 0 0 4px 0; color: var(--text-color); }
+        .subtitle { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .spec-box {
+            background-color: #262626;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .spec-label { font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; }
+        .spec-value { font-size: 14px; font-weight: bold; }
+
+        .section-title {
+            font-size: 16px;
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 4px;
+            margin: 16px 0 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dotted #333;
+            font-size: 13px;
+        }
+
+        .detail-label { color: var(--text-muted); }
+        .detail-value { font-weight: 500; text-align: right; max-width: 60%; word-break: break-word; }
+
+        .description {
+            font-size: 13.5px;
+            line-height: 1.5;
+            color: #ccc;
+            background-color: #1a1a1a;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .gallery-thumb {
+            width: 100%;
+            height: 70px;
+            object-fit: contain;
+            background: #151515;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            opacity: 0.7;
+            transition: all 0.2s;
+            color: transparent;
+        }
+
+        .gallery-thumb.active, .gallery-thumb:hover {
+            border-color: var(--accent-color);
+            opacity: 1;
+        }
+
+        .service-box {
+            background: #1e251e;
+            border: 1px solid #2ec4b6;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .service-box.warning {
+            background: #2b1d1d;
+            border-color: var(--danger-color);
+        }
+
+        .service-status-text {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .btn-service-action {
+            background: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 8px;
+            width: 100%;
+        }
+
+        .maintenance-form {
+            background: #222;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            border: 1px solid var(--border-color);
+            display: none;
+        }
+
+        .maintenance-form input, .maintenance-form textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 4px;
+            margin-bottom: 8px;
+            background: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 13px;
+        }
+
+        #global-map {
+            width: 100%;
+            height: 380px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--accent-color);
+            max-width: 90%;
+            width: 380px;
+            box-sizing: border-box;
+        }
+
+        .settings-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 14px;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .settings-row label { color: var(--text-muted); font-weight: bold; }
+        .settings-row input[type="color"], .settings-row select { width: 100%; padding: 6px; }
+
+        /* Lightbox Oprava zobrazení */
+        #lightbox-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92);
+            justify-content: center;
+            align-items: center;
+            z-index: 500;
+            touch-action: pan-y;
+        }
+
+        #lightbox-img {
+            display: block;
+            max-width: 92%;
+            max-height: 82vh;
+            border-radius: 8px;
+            box-shadow: 0 0 25px rgba(0,0,0,0.9);
+            object-fit: contain;
+            user-select: none;
+            opacity: 1 !important;
+            filter: none !important;
+            mix-blend-mode: normal;
+        }
+
+        .lightbox-close-top {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            color: #fff;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 520;
+        }
+
+        .lightbox-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            border: none;
+            font-size: 28px;
+            padding: 10px 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 510;
+        }
+        .lightbox-prev { left: 10px; }
+        .lightbox-next { right: 10px; }
+
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .close-btn {
+            background: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        #error-msg {
+            display: none;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #4a1212;
+            border: 1px solid #ff4d4d;
+            border-radius: 6px;
+            color: #ffcccc;
+            font-size: 13px;
+        }
+
+        #print-view {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #ffffff;
+            color: #000000;
+            z-index: 200;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .print-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .qr-card {
+            border: 2px dashed #000000;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            background: #fff;
+            page-break-inside: avoid;
+        }
+
+        .qr-card-code { font-size: 14px; font-weight: bold; color: #000; margin-bottom: 4px; }
+        .qr-card-title { font-size: 12px; font-weight: 600; color: #333; height: 32px; overflow: hidden; margin-bottom: 8px; }
+        .qr-card-img { display: flex; justify-content: center; margin-bottom: 6px; }
+
+        .print-actions {
+            position: sticky;
+            top: 0;
+            background: #f0f0f0;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            gap: 10px;
+            margin: -20px -20px 20px -20px;
+        }
+
+        @media print {
+            .print-actions { display: none; }
+            #print-view { padding: 0; }
+            body { background: #fff; }
+        }
+
+/* Vylepšený přehled sbírky */
+.dashboard-header {background:linear-gradient(135deg,#29251b 0%,#1d1d1d 65%);border:1px solid var(--border-color);border-radius:14px;padding:20px 14px 16px;margin-bottom:16px;min-height:95px;box-sizing:border-box}
+.dashboard-title {font-size:clamp(22px,5vw,30px);letter-spacing:.3px;padding-top:2px}
+.dashboard-header .header-menu-left {top:14px;left:12px}
+.dashboard-header .settings-btn-right {top:14px;right:12px}
+.collection-highlights {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:15px}
+.collection-highlight {background:var(--card-bg,#262626);border:1px solid var(--border-color);border-radius:11px;padding:12px 6px;text-align:center}
+.collection-highlight strong {display:block;color:var(--accent-color);font-size:clamp(15px,3.6vw,21px);margin-bottom:3px}
+.collection-highlight span {color:var(--text-muted);font-size:11px}
+.advanced-toggle {width:100%;padding:11px 13px;background:#292929;border:1px solid var(--border-color);border-radius:8px;color:var(--accent-color);font-weight:bold;cursor:pointer;text-align:left}
+.advanced-filter-panel {display:none;background:#222;border:1px solid var(--border-color);border-radius:10px;padding:12px;gap:10px;flex-direction:column}
+.advanced-filter-panel.open {display:flex}
+.advanced-filter-panel label {display:block;color:var(--text-muted);font-size:12px;margin-bottom:5px}
+.advanced-filter-panel input,.advanced-filter-panel select {width:100%;box-sizing:border-box;min-width:0;background:#2a2a2a;border:1px solid var(--border-color);border-radius:6px;color:var(--text-color);padding:9px;font-size:13px}
+.advanced-filter-panel .filter-grid>div {min-width:0}
+.filter-reset {border:1px solid var(--accent-color);border-radius:7px;background:transparent;color:var(--accent-color);padding:10px;cursor:pointer;font-weight:bold}
+
+
+.highlight-action{cursor:pointer;color:var(--text-color);font-family:inherit;transition:transform .2s,border-color .2s}
+.highlight-action:hover,.highlight-action:focus-visible{border-color:var(--accent-color);transform:translateY(-2px)}
+.compare-card-btn{display:block;width:100%;margin-bottom:7px;padding:5px;border:1px solid #555;border-radius:6px;background:#252525;color:#ddd;font-size:11px;cursor:pointer}
+.compare-card-btn.selected{border-color:var(--accent-color);color:var(--accent-color)}
+.compare-bar{position:fixed;z-index:999;bottom:12px;left:50%;transform:translateX(-50%);align-items:center;gap:10px;background:#242424;border:1px solid var(--accent-color);padding:10px;border-radius:12px;box-shadow:0 4px 20px #0009;white-space:nowrap}
+.compare-bar button{background:var(--accent-color);color:#111;border:0;border-radius:6px;padding:8px;font-weight:bold;cursor:pointer}
+.compare-content{width:94%;max-width:900px}.compare-scroll{overflow-x:auto}#compare-table{border-collapse:collapse;min-width:560px;width:100%;font-size:13px}#compare-table th,#compare-table td{padding:9px;border-bottom:1px solid #444;text-align:left;vertical-align:top}#compare-table th{color:var(--accent-color)}
+.related-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.related-card{text-align:left;border:1px solid #555;border-radius:8px;background:#282828;color:#fff;padding:11px;cursor:pointer}.related-card strong,.related-card small{display:block}.related-card small{color:#aaa;margin-top:5px}
+@media(max-width:430px){.compare-bar{font-size:12px;gap:6px}.compare-bar button{padding:7px}}
+
+/* Přepínání katalog / galerie */
+.view-switch{display:flex;gap:6px;padding:5px;background:#242424;border:1px solid #383838;border-radius:13px;margin:0 0 15px}
+.view-switch button{flex:1;border:0;background:transparent;color:#aaa;border-radius:9px;padding:11px;cursor:pointer;font-weight:700}
+.view-switch button.active{background:var(--accent-color);color:#171717}
+.items-grid.gallery-mode{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px}
+.items-grid.gallery-mode .item-card{position:relative;min-width:0;background:#171717}
+.items-grid.gallery-mode .item-card-img-wrap{height:210px!important}
+.items-grid.gallery-mode .item-card-img{width:100%;height:100%;object-fit:contain}
+.items-grid.gallery-mode .item-card-body{padding:9px 11px 12px}
+.items-grid.gallery-mode .item-card-title{font-size:13px;line-height:1.35}
+.items-grid.gallery-mode .item-card-meta,.items-grid.gallery-mode .compare-card-btn{display:none}
+@media(min-width:720px){.items-grid.gallery-mode{grid-template-columns:repeat(3,minmax(0,1fr))!important}.items-grid.gallery-mode .item-card-img-wrap{height:260px!important}}
+/* Muzejní úvod – jemnější hierarchie a přehlednější karty */
+.dashboard-header{background:radial-gradient(ellipse at 50% -40%,color-mix(in srgb,var(--accent-color) 15%,transparent),transparent 70%),linear-gradient(145deg,#27231e,#191919 72%);border-radius:20px;padding:27px 14px 23px;box-shadow:0 10px 32px #0003}
+.dashboard-title{font-weight:850;letter-spacing:.7px;font-size:clamp(23px,4.5vw,32px);text-shadow:0 2px 18px #0006}
+.collection-highlights{gap:10px;margin:18px 0 20px}
+.collection-highlight{border-radius:15px;padding:16px 5px;background:linear-gradient(160deg,#282828,#202020);box-shadow:0 5px 15px #0002}
+.collection-highlight strong{font-size:clamp(21px,4.5vw,29px);font-variant-numeric:tabular-nums}
+.collection-highlight span{font-size:clamp(10px,2.3vw,12px)}
+.filter-panel{margin-bottom:18px}
+.item-card{overflow:hidden;border-radius:13px;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.item-card:hover{transform:translateY(-3px);box-shadow:0 10px 24px #0005;border-color:var(--accent-color)}
+.item-card-img-wrap{overflow:hidden}
+.item-card-img{transition:transform .25s ease}
+.item-card:hover .item-card-img{transform:scale(1.035)}
+.compare-card-btn{border-radius:8px;padding:7px 5px;background:#2e2b26;border-color:#625334}
+.compare-section-row th{background:#332b1b;color:var(--accent-color)!important;letter-spacing:.4px;padding:12px 9px!important}
+#compare-table td{min-width:145px;overflow-wrap:anywhere}
+#compare-table tr:nth-child(even):not(.compare-section-row){background:#ffffff06}
+@media(prefers-reduced-motion:reduce){.item-card,.item-card-img{transition:none!important}}
+
+    
+/* Vyhledávání a pokročilé filtrování ve společném řádku */
+.search-advanced-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:stretch}
+.search-advanced-row .search-input{width:100%;min-width:0;box-sizing:border-box;margin:0}
+.search-advanced-row .advanced-toggle{width:100%;min-width:0;margin:0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:clamp(11px,2.6vw,14px);padding:8px 5px;white-space:normal}
+@media(max-width:390px){.search-advanced-row{gap:6px}.search-advanced-row .search-input{font-size:12px;padding:9px 7px}.search-advanced-row .advanced-toggle{font-size:11px;padding:8px 3px}}
+
+
+/* Sbírka 3.0 – přehledné nástroje pro růst kolekce */
+.collection-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0 16px}
+.collection-tools button{border:1px solid #534627;border-radius:11px;background:#242321;color:#f5e5b4;padding:12px 7px;font-weight:700;cursor:pointer;font-size:13px}
+.collection-tools button:focus-visible,.collection-tools button:hover{border-color:var(--accent-color);outline:none}
+.collection-tools .wide{grid-column:1/-1}
+.tool-modal-content{max-width:760px!important;max-height:88vh;overflow:auto}
+.tool-list{display:grid;gap:9px;margin:12px 0}
+.tool-row{padding:11px;background:#252525;border:1px solid #393939;border-radius:9px}
+.tool-row strong{color:var(--accent-color)}
+.tool-row small{display:block;color:#aaa;margin-top:5px}
+.tool-chart{display:grid;grid-template-columns:minmax(100px,1fr) 2fr 35px;gap:10px;align-items:center;margin:9px 0;font-size:13px}
+.tool-chart .bar{height:12px;background:#333;border-radius:8px;overflow:hidden}
+.tool-chart .bar span{display:block;height:100%;background:var(--accent-color)}
+.tool-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.tool-actions button,.tool-form button{padding:10px;border:1px solid var(--accent-color);border-radius:8px;background:#272727;color:var(--accent-color);font-weight:700;cursor:pointer}
+.tool-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tool-form label{display:grid;gap:5px;font-size:13px;color:#ccc}
+.tool-form input,.tool-form textarea,.tool-form select{width:100%;padding:10px;border:1px solid #555;background:#282828;color:#fff;border-radius:8px}
+.tool-form .full{grid-column:1/-1}
+.favorite-toggle{position:absolute;left:8px;top:8px;z-index:3;border:1px solid #555;background:#1c1c1cdb;border-radius:50%;width:33px;height:33px;color:#ddd;font-size:19px;cursor:pointer}
+.favorite-toggle.active{color:#ffbf00;border-color:#ffbf00}
+.item-card{position:relative}
+@media(max-width:500px){.tool-form{grid-template-columns:1fr}.tool-form .full{grid-column:auto}}
+
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div id="error-msg"></div>
+
+    <!-- ÚVODNÍ DASHBOARD -->
+    <div id="dashboard-view">
+        <div class="dashboard-header">
+            <div class="header-menu-left">
+                <button class="icon-btn-round" onclick="openHubModal()" title="Přehledy & Statistiky">
+                    📊
+                </button>
+            </div>
+
+            <div class="settings-btn-right">
+                <button class="icon-btn-round" onclick="openSettingsModal()" title="Nastavení" style="padding:6px 8px;">⚙️</button>
+            </div>
+
+            <div class="dashboard-title">Katalog zbraní</div>
+            
+        </div>
+
+        <div class="collection-highlights" aria-label="Sbírka v číslech">
+            <div class="collection-highlight"><strong id="highlight-count">—</strong><span>Předmětů</span></div>
+            <button type="button" class="collection-highlight highlight-action" onclick="openMapByMode('made')" title="Otevřít mapu zemí původu"><strong id="highlight-countries">—</strong><span>🌍 Zemí původu ↗</span></button>
+            <button type="button" class="collection-highlight highlight-action" onclick="openMapByMode('origin')" title="Otevřít mapu míst získání"><strong id="highlight-acquired">—</strong><span>📍 Zemí získání ↗</span></button>
+        </div>
+        <div class="filter-panel">
+            <div class="search-advanced-row">
+                <input type="text" id="search-input" class="search-input" placeholder="🔍 Hledat název, ocel, výrobce..." oninput="filterItems()">
+                <button type="button" class="advanced-toggle" id="advanced-toggle" aria-expanded="false" onclick="toggleAdvancedFilters()">⚙️ Pokročilé filtrování ▾</button>
+            </div>
+            
+            <div class="filter-grid">
+                <select id="collection-filter" onchange="filterItems()">
+                    <option value="">Všechny kolekce</option>
+                </select>
+
+                <select id="category-filter" onchange="filterItems()">
+                    <option value="">Všechny kategorie</option>
+                </select>
+            </div>
+
+            <div class="filter-grid" style="grid-template-columns: 1fr;">
+                <select id="sort-select" onchange="filterItems()">
+                    <option value="code-asc">Řadit: Kód Vzestupně (#M-001)</option>
+                    <option value="code-desc">Řadit: Kód Sestupně (#M-099)</option>
+                    <option value="date-desc">Řadit: Datum (Nejnovější)</option>
+                    <option value="date-asc">Řadit: Datum (Nejstarší)</option>
+                    <option value="name-asc">Řadit: Název (A-Z)</option>
+                    <option value="rating-desc">Řadit: Osobní hodnocení (nejvyšší)</option>
+                    <option value="rating-asc">Řadit: Osobní hodnocení (nejnižší)</option>
+                </select>
+            </div>
+            <div class="advanced-filter-panel" id="advanced-filter-panel">
+                <div class="filter-grid">
+                    <div><label for="country-filter">Země původu</label><select id="country-filter" onchange="filterItems()"><option value="">Všechny země původu</option></select></div>
+                    <div><label for="acquired-country-filter">Země získání</label><select id="acquired-country-filter" onchange="filterItems()"><option value="">Všechny země získání</option></select></div>
+                </div>
+                <div class="filter-grid">
+                    <div><label for="maker-filter">Výrobce</label><select id="maker-filter" onchange="filterItems()"><option value="">Všichni výrobci</option></select></div>
+                </div>
+                <div class="filter-grid">
+                    <div><label for="steel-filter">Materiál čepele</label><input id="steel-filter" placeholder="Např. D2, 420, uhlíková" oninput="filterItems()"></div>
+                    <div><label for="status-filter">Stav / status</label><select id="status-filter" onchange="filterItems()"><option value="">Všechny stavy</option></select></div>
+                </div>
+                <button type="button" class="filter-reset" onclick="resetCatalogFilters()">↺ Vymazat všechny filtry</button>
+            </div>
+        </div>
+
+        <div class="collection-tools" id="collection-tools">
+          <button type="button" onclick="openCollectionTool('audit')">🔎 Kontrola údajů</button>
+          <button type="button" onclick="openCollectionTool('timeline')">🕒 Časová osa</button>
+          <button type="button" onclick="openCollectionTool('stats')">📊 Grafy sbírky</button>
+          <button type="button" onclick="openCollectionTool('favorites')">★ Oblíbené</button>
+        </div>
+        <div class="view-switch" role="group" aria-label="Zobrazení sbírky"><button id="view-catalog" class="active" onclick="setCollectionView('catalog')" type="button">☷ Katalog</button><button id="view-gallery" onclick="setCollectionView('gallery')" type="button">▦ Galerie</button></div>
+        <div class="items-grid cols-2" id="items-grid"></div>
+    </div>
+
+    <!-- DETAIL NOŽE -->
+    <div id="detail-view" style="display: none;">
+        <button class="back-btn" id="back-to-dashboard-btn" onclick="history.back()">← Zpět na přehled sbírky</button>
+
+        <div class="image-container" onclick="openLightbox(currentActivePhotoIndex)">
+            <span class="badge" id="item-id">#M-000</span>
+            <button class="qr-btn" id="qr-btn" onclick="event.stopPropagation(); showQRCode();">QR Kód</button>
+            <img id="hero-img" src="" onerror="handleImgError(this)" alt="">
+            <div class="zoom-hint">🔍 Zvětšit fotku</div>
+        </div>
+
+        <h1 id="item-title">Načítání...</h1>
+        <div class="subtitle" id="item-subtitle">-</div>
+
+        <button class="btn-action" style="width: 100%; margin-bottom: 14px; background: #25d366; color: #fff; border-color: #25d366;" onclick="shareOnWhatsApp()">
+            💬 Sdílet specifikaci na WhatsApp
+        </button>
+
+        <div class="grid-2">
+            <div class="spec-box">
+                <div class="spec-label">OCEL / MATERIÁL</div>
+                <div class="spec-value" id="spec-steel">-</div>
+            </div>
+            <div class="spec-box">
+                <div class="spec-label">TVRDOST</div>
+                <div class="spec-value" id="spec-hrc">-</div>
+            </div>
+            <div class="spec-box">
+                <div class="spec-label">KONSTRUKCE</div>
+                <div class="spec-value" id="spec-construction">-</div>
+            </div>
+            <div class="spec-box">
+                <div class="spec-label">ZEMĚ PŮVODU</div>
+                <div class="spec-value" id="spec-origin">-</div>
+            </div>
+        </div>
+
+        <div id="gallery-section" style="display: none;">
+            <div class="section-title">Fotogalerie</div>
+            <div class="gallery-grid" id="gallery-grid"></div>
+        </div>
+
+        <div class="section-title">Pořízení & Expedice</div>
+        <div class="detail-row"><span class="detail-label">Země získání:</span><span class="detail-value" id="origin-country">-</span></div>
+        <div class="detail-row"><span class="detail-label">Místo pořízení:</span><span class="detail-value" id="origin-place">-</span></div>
+        <div class="detail-row"><span class="detail-label">Kolekce / Status:</span><span class="detail-value" id="origin-expedition">-</span></div>
+        <div class="detail-row"><span class="detail-label">Datum pořízení:</span><span class="detail-value" id="origin-year">-</span></div>
+
+        <div class="section-title">Technická specifikace</div>
+        <div class="detail-row"><span class="detail-label">Délka čepele:</span><span class="detail-value" id="tech-blade-len">-</span></div>
+        <div class="detail-row"><span class="detail-label">Tloušťka čepele:</span><span class="detail-value" id="tech-blade-thick">-</span></div>
+        <div class="detail-row"><span class="detail-label">Celková délka:</span><span class="detail-value" id="tech-total-len">-</span></div>
+        <div class="detail-row"><span class="detail-label">Rukojeť:</span><span class="detail-value" id="tech-handle">-</span></div>
+        <div class="detail-row"><span class="detail-label">Pouzdro:</span><span class="detail-value" id="tech-sheath">-</span></div>
+        <div class="detail-row"><span class="detail-label">Pojistka:</span><span class="detail-value" id="tech-lock">-</span></div>
+
+
+        <div class="section-title">Příběh & Popis</div>
+        <div class="description" id="item-description">-</div>
+
+        <div id="acquisition-story-section" style="display:none"><div class="section-title">🧭 Příběh získání</div><div class="description" id="acquisition-story"></div></div>
+        <div id="related-items-section" style="display:none"><div class="section-title">🔗 Související exponáty</div><div class="related-items" id="related-items"></div></div>
+        <div id="full-passport-wrapper" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+            <button class="btn-action" style="width: 100%; padding: 12px; font-size: 14px;" onclick="toggleFullPassport()">
+                📋 Zobrazit / Skrýt kompletní data z tabulky
+            </button>
+            <div id="full-passport-container" style="display: none; margin-top: 15px; background: #181818; padding: 12px; border-radius: 8px; border: 1px solid #333;">
+                <div class="section-title" style="margin-top:0;">Kompletní pasport artefaktu</div>
+                <div id="full-passport-rows"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Hlavní Nabídky -->
+<div class="modal" id="hub-modal">
+    <div class="modal-content" style="width: 90%; max-width: 360px; text-align: left;">
+        <h3 style="margin-top:0; color:var(--accent-color); text-align: center;">📊 Přehledy & Statistiky</h3>
+        
+        <button class="btn-action" style="width:100%; padding:10px; margin-bottom:8px; text-align:left; font-size:13px;" onclick="closeHubModal(); openGlobalMapModal();">
+            🗺️ Interaktivní mapa sbírky
+        </button>
+
+        <div style="background: #252525; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px;">
+            <div style="font-weight: bold; color: var(--accent-color); margin-bottom: 6px; text-align: center;">📈 Rychlé statistiky sbírky</div>
+            <div id="quick-stats-content">Načítám statistiky...</div>
+        </div>
+
+        <div style="text-align: center; margin-top: 12px;">
+            <button class="close-btn" onclick="closeHubModal()" style="margin-top:0;">Zavřít</button>
+        </div>
+    </div>
+</div>
+
+<div id="compare-bar" class="compare-bar" style="display:none"><span>⚖️ Vybráno: <b id="compare-count">0</b>/4</span><button onclick="openCompareModal()">Porovnat</button><button onclick="comparedIndices.clear();updateCompareBar()">Vymazat</button></div>
+<div class="modal" id="compare-modal"><div class="modal-content compare-content"><h3>⚖️ Porovnání předmětů</h3><div class="compare-scroll"><table id="compare-table"></table></div><button class="close-btn" onclick="document.getElementById('compare-modal').style.display='none'">Zavřít</button></div></div>
+<!-- Modal Mapa -->
+<div class="modal" id="collection-tool-modal"><div class="modal-content tool-modal-content">
+  <h2 id="collection-tool-title" style="color:var(--accent-color)">Nástroje sbírky</h2>
+  <div id="collection-tool-body"></div>
+  <button class="close-btn" type="button" onclick="closeNavigationModal('collection-tool-modal')">Zavřít</button>
+</div></div>
+<div class="modal" id="map-modal">
+    <div class="modal-content" style="width: 92%; max-width: 500px;">
+        <h3 style="margin-top:0; color:var(--accent-color);">🗺️ Interaktivní mapa sbírky</h3>
+        <div class="settings-row">
+            <label>Zobrazit na mapě:</label>
+            <select id="map-mode-select" onchange="renderGlobalMapMarkers()">
+                <option value="origin">Místo pořízení / nákupu (vč. detailu)</option>
+                <option value="made">Země původu / výroby</option>
+            </select>
+        </div>
+        <div id="global-map"></div>
+        <button class="close-btn" onclick="closeGlobalMapModal()">Zavřít mapu</button>
+    </div>
+</div>
+
+
+<!-- Modal Nastavení -->
+<div class="modal" id="settings-modal">
+    <div class="modal-content" style="max-height: 85vh; overflow-y: auto; text-align: left;">
+        <h3 style="margin-top:0; color:var(--accent-color); text-align:center;">⚙️ Nastavení aplikace</h3>
+        
+        <div class="settings-row">
+            <label>Zobrazení karet v přehledu:</label>
+            <select id="setting-grid-layout" onchange="applySettings()">
+                <option value="cols-1">1 sloupec (Velké karty)</option>
+                <option value="cols-2" selected>2 sloupce (Standardní)</option>
+                <option value="cols-3">3 sloupce (Kompaktní)</option>
+                <option value="cols-list">Řádkový seznam</option>
+            </select>
+        </div>
+
+        <div class="settings-row">
+            <label>Barva pozadí:</label>
+            <input type="color" id="setting-bg" value="#121212" onchange="applySettings()">
+        </div>
+
+        <div class="settings-row">
+            <label>Barva karet / panelu:</label>
+            <input type="color" id="setting-card" value="#1e1e1e" onchange="applySettings()">
+        </div>
+
+        <div class="settings-row">
+            <label>Hlavní akcentní barva:</label>
+            <input type="color" id="setting-accent" value="#ffb703" onchange="applySettings()">
+        </div>
+
+        <div class="settings-row">
+            <label>Velikost písma:</label>
+            <select id="setting-fontsize" onchange="applySettings()">
+                <option value="12px">Malé (12px)</option>
+                <option value="14px" selected>Normální (14px)</option>
+                <option value="16px">Velké (16px)</option>
+            </select>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 12px;">
+            <button class="btn-action" style="width:100%; margin-bottom:8px;" onclick="closeSettingsModal(); openPrintView();">🖨️ Tisk štítků s QR kódy</button>
+        </div>
+
+        <div style="text-align: center; margin-top: 15px;">
+            <button class="close-btn" onclick="resetSettings()" style="background:#444; color:#fff; margin-right:8px;">Výchozí</button>
+            <button class="close-btn" onclick="closeSettingsModal()">Uložit a zavřít</button>
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox Modal -->
+<div id="lightbox-modal" onclick="closeLightbox()">
+    <span class="lightbox-close-top" onclick="closeLightbox()">&times;</span>
+    <button class="lightbox-nav lightbox-prev" onclick="event.stopPropagation(); prevLightboxImg();">‹</button>
+    <img id="lightbox-img" src="" alt="" onerror="handleImgError(this)">
+    <button class="lightbox-nav lightbox-next" onclick="event.stopPropagation(); nextLightboxImg();">›</button>
+</div>
+
+<!-- QR kód -->
+<div class="modal" id="qr-modal">
+    <div class="modal-content" style="width:auto;">
+        <h2 id="qr-code-text" style="margin:0; color:var(--accent-color);"></h2>
+        <h3 id="qr-title" style="margin:5px 0 0 0; color:#fff; font-size:15px;"></h3>
+        <div id="qrcode"></div>
+        <div id="qr-url-text" style="font-size:11px; color:#aaa; word-break: break-all;"></div>
+        <button class="close-btn" onclick="hideQRCode()">Zavřít</button>
+    </div>
+</div>
+
+<!-- Tisk -->
+<div id="print-view">
+    <div class="print-actions">
+        <button class="close-btn" onclick="window.print()">🖨️ Vytisknout / Uložit do PDF</button>
+        <button class="close-btn" style="background:#666; color:#fff;" onclick="closePrintView()">Zavřít</button>
+    </div>
+    <h2>Tiskové štítky artefaktů</h2>
+    <div class="print-grid" id="print-grid"></div>
+</div>
+
+<script>
+    let allItems = [];
+    let filteredItems = [];
+    let currentSelectedItem = null;
+    let isDirectQRMode = false;
+    let globalMap = null;
+
+    let currentLightboxPhotos = [];
+    let currentLightboxIndex = 0;
+    let detailPhotoRenderToken = 0;
+    let lightboxLoadingToken = 0;
+    let currentActivePhotoIndex = 0;
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    function loadSettings() {
+        const bg = localStorage.getItem('app_bg') || '#121212';
+        const card = localStorage.getItem('app_card') || '#1e1e1e';
+        const accent = localStorage.getItem('app_accent') || '#ffb703';
+        const fsize = localStorage.getItem('app_fontsize') || '14px';
+        const gridLayout = localStorage.getItem('app_grid_layout') || 'cols-2';
+
+        document.documentElement.style.setProperty('--bg-color', bg);
+        document.documentElement.style.setProperty('--card-bg', card);
+        document.documentElement.style.setProperty('--accent-color', accent);
+        document.documentElement.style.setProperty('--base-font-size', fsize);
+
+        applyGridLayoutClass(gridLayout);
+
+        if (document.getElementById('setting-bg')) document.getElementById('setting-bg').value = bg;
+        if (document.getElementById('setting-card')) document.getElementById('setting-card').value = card;
+        if (document.getElementById('setting-accent')) document.getElementById('setting-accent').value = accent;
+        if (document.getElementById('setting-fontsize')) document.getElementById('setting-fontsize').value = fsize;
+        if (document.getElementById('setting-grid-layout')) document.getElementById('setting-grid-layout').value = gridLayout;
+    }
+
+    function applyGridLayoutClass(layoutClass) {
+        const grid = document.getElementById('items-grid');
+        if (grid) grid.className = "items-grid " + layoutClass;
+    }
+
+    function applySettings() {
+        const bg = document.getElementById('setting-bg').value;
+        const card = document.getElementById('setting-card').value;
+        const accent = document.getElementById('setting-accent').value;
+        const fsize = document.getElementById('setting-fontsize').value;
+        const gridLayout = document.getElementById('setting-grid-layout').value;
+
+        document.documentElement.style.setProperty('--bg-color', bg);
+        document.documentElement.style.setProperty('--card-bg', card);
+        document.documentElement.style.setProperty('--accent-color', accent);
+        document.documentElement.style.setProperty('--base-font-size', fsize);
+
+        applyGridLayoutClass(gridLayout);
+
+        localStorage.setItem('app_bg', bg);
+        localStorage.setItem('app_card', card);
+        localStorage.setItem('app_accent', accent);
+        localStorage.setItem('app_fontsize', fsize);
+        localStorage.setItem('app_grid_layout', gridLayout);
+
+        filterItems();
+    }
+
+    function resetSettings() {
+        localStorage.clear();
+        loadSettings();
+        filterItems();
+        alert("Nastavení bylo obnoveno do výchozího stavu.");
+    }
+
+
+
+
+
+    function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
+    function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
+    
+    function openHubModal() {
+        updateQuickStats();
+        document.getElementById('hub-modal').style.display = 'flex';
+    }
+    function closeHubModal() { document.getElementById('hub-modal').style.display = 'none'; }
+
+    loadSettings();
+
+    /* Filtrování tloušťky čepele - bez nesmyslů */
+    function cleanThicknessValue(val) {
+        if (!val) return null;
+        let str = String(val).trim();
+        if (str.includes('T') || str.includes('Z') || str.includes('2026') || str.includes('2025') || str.includes('2024')) {
+            let nums = str.match(/\b([1-9]\.[0-9]|[1-9]|1[0-5])\b/);
+            if (nums) return nums[1];
+            return null;
+        }
+        let cleanNum = str.replace(',', '.').replace(/[^0-9.]/g, '');
+        let num = parseFloat(cleanNum);
+        if (isNaN(num) || num > 30 || num < 0.5) return null;
+        return cleanNum;
+    }
+
+    function getCoords(text) {
+        if (!text) return null;
+        const t = text.toLowerCase();
+        if (t.includes('karviná') || t.includes('tesco') || t.includes('sztablova')) return [49.8547, 18.5414];
+        if (t.includes('bestarmy') || t.includes('třinec')) return [49.6766, 18.6702];
+        if (t.includes('zakopané') || t.includes('polsko')) return [49.2992, 19.9496];
+        if (t.includes('bulharsko') || t.includes('sarandě') || t.includes('albánii')) {
+            if (t.includes('albánii') || t.includes('sarandě')) return [39.8756, 20.0047];
+            return [42.7339, 25.4858];
+        }
+        if (t.includes('rotterdam') || t.includes('holandsko')) return [51.9244, 4.4777];
+        if (t.includes('helsinki') || t.includes('marttiini')) return [60.1699, 24.9384];
+        if (t.includes('keňa') || t.includes('brenda') || t.includes('nairobi')) return [-1.2921, 36.8219];
+        if (t.includes('ostrava') || t.includes('armatex')) return [49.8209, 18.2625];
+        if (t.includes('jar') || t.includes('botswana')) return [-25.7479, 28.2293];
+        if (t.includes('finsko')) return [61.9241, 25.7482];
+        if (t.includes('usa') || t.includes('new york') || t.includes('olelean')) return [40.7128, -74.0060];
+        if (t.includes('česká republika') || t.includes('česko') || t.includes('československo') || t.includes('čssr')) return [49.8175, 15.4730];
+        if (t.includes('čina')) return [35.8617, 104.1954];
+        if (t.includes('rusko') || t.includes('kizlyar')) return [55.7558, 37.6173];
+        if (t.includes('švýcarsko')) return [46.8182, 8.2275];
+        if (t.includes('francie')) return [46.6034, 1.8883];
+        if (t.includes('pakistán')) return [30.3753, 69.3451];
+        if (t.includes('španělsko')) return [40.4637, -3.7492];
+        return null;
+    }
+
+    function openMapByMode(mode) {
+        const select=document.getElementById('map-mode-select');
+        if(select)select.value=mode;
+        openGlobalMapModal();
+    }
+
+    function openGlobalMapModal() {
+        document.getElementById('map-modal').style.display = 'flex';
+        setTimeout(() => {
+            if (!globalMap) {
+                globalMap = L.map('global-map').setView([49.6766, 18.6702], 4);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(globalMap);
+            } else {
+                globalMap.invalidateSize();
+            }
+            renderGlobalMapMarkers();
+        }, 200);
+    }
+
+    function closeGlobalMapModal() { document.getElementById('map-modal').style.display = 'none'; }
+
+
+
+
+
+
+
+    function updateQuickStats() {
+        const statsElem = document.getElementById('quick-stats-content');
+        if (!statsElem) return;
+
+        let total = allItems.length;
+        let carbonCount = 0;
+        let stainlessCount = 0;
+
+        allItems.forEach(item => {
+            const steel = (item["Mat. čepele / hlavní části"] || item["Mat. čepele"] || "").toLowerCase();
+            if (steel.includes('1095') || steel.includes('80crv2') || steel.includes('uhlík') || steel.includes('carbon')) {
+                carbonCount++;
+            } else {
+                stainlessCount++;
+            }
+        });
+
+        statsElem.innerHTML = `
+            <div>• Celkem položek ve sbírce: <b>${total}</b></div>
+            <div>• Uhlíkové / nástrojové oceli: <b>${carbonCount}</b></div>
+            <div>• Nerezové oceli / ostatní: <b>${stainlessCount}</b></div>
+        `;
+    }
+
+    function renderGlobalMapMarkers() {
+        if (!globalMap) return;
+        const mode = document.getElementById('map-mode-select').value;
+        globalMap.eachLayer(layer => { if (layer instanceof L.Marker) globalMap.removeLayer(layer); });
+
+        let bounds = [];
+        allItems.forEach((item, index) => {
+            let searchField = mode === 'origin' ? ((item["Místo_pořízení_detail"] || "") + " " + (item["Země získání"] || "")) : (item["Země původu"] || "");
+            let detailText = mode === 'origin' ? (item["Místo_pořízení_detail"] || item["Země získání"] || "Neuvedeno") : (item["Země původu"] || "Neuvedeno");
+            let coords = getCoords(searchField);
+
+            if (coords) {
+                const code = getItemCode(item, index);
+                const title = getItemName(item);
+                const marker = L.marker(coords).addTo(globalMap);
+                marker.bindPopup(`<b>${code}: ${title}</b><br><span style="color:var(--accent-color);">${detailText}</span>`);
+                bounds.push(coords);
+            }
+        });
+
+        if (bounds.length > 0) globalMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+    }
+
+    function showError(msg) {
+        const err = document.getElementById('error-msg');
+        if (err) {
+            err.style.display = 'block';
+            err.innerHTML = '<strong>Chyba:</strong> ' + msg;
+        }
+    }
+
+    function formatDate(raw) {
+        if (!raw) return "-";
+        if (typeof raw === 'string' && raw.includes('T')) {
+            const d = new Date(raw);
+            if (!isNaN(d.getTime())) return d.toLocaleDateString('cs-CZ');
+        }
+        return raw;
+    }
+
+    function safeSetText(id, text) {
+        const elem = document.getElementById(id);
+        if (elem) elem.innerText = (text !== null && text !== undefined && text !== "") ? text : "-";
+    }
+
+    // Obrázek načítáme postupně s různými příponami a velikostí písmen.
+    // Původní verze měnila jen aktuální příponu, neřešila všechny formáty
+    // a po neúspěchu nechávala obrázek ztmavený.
+    const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'avif'];
+
+    function getPhotoCandidates(path) {
+        if (!path) return [];
+        const cleanPath = String(path).trim();
+        if (!cleanPath) return [];
+
+        // Zachovej případné query parametry/hash a měň příponu pouze v cestě.
+        const match = cleanPath.match(/^([^?#]*)([?#].*)?$/);
+        const pathname = match ? match[1] : cleanPath;
+        const suffix = match && match[2] ? match[2] : '';
+        const extMatch = pathname.match(/\.([a-zA-Z0-9]+)$/);
+        const stem = extMatch ? pathname.slice(0, -extMatch[0].length) : pathname;
+        const candidates = [];
+
+        // Pokud cesta příponu má, zkus nejdřív přesně původní soubor.
+        if (extMatch) candidates.push(pathname + suffix);
+
+        PHOTO_EXTENSIONS.forEach(ext => {
+            candidates.push(stem + '.' + ext + suffix);
+            candidates.push(stem + '.' + ext.toUpperCase() + suffix);
+        });
+
+        return [...new Set(candidates)];
+    }
+
+    function setImageSource(imgElement, path) {
+        if (!imgElement) return;
+        const candidates = getPhotoCandidates(path);
+        imgElement.dataset.photoCandidates = JSON.stringify(candidates);
+        imgElement.dataset.photoCandidateIndex = '0';
+        imgElement.style.opacity = '1';
+        imgElement.style.filter = 'none';
+        // onerror dostává Event, nikoli element; předáme správný <img>.
+        imgElement.onerror = function () { handleImgError(imgElement); };
+
+        if (!candidates.length) {
+            handleImgError(imgElement);
+            return;
+        }
+        imgElement.src = candidates[0];
+    }
+
+    function handleImgError(imgElement) {
+        if (!imgElement) return;
+
+        let candidates = [];
+        try {
+            candidates = JSON.parse(imgElement.dataset.photoCandidates || '[]');
+        } catch (_) {
+            candidates = [];
+        }
+
+        const nextIndex = Number(imgElement.dataset.photoCandidateIndex || 0) + 1;
+        if (nextIndex === 1) console.warn('[Katalog] Zkouším alternativní příponu pro:', candidates[0]);
+        if (nextIndex < candidates.length) {
+            imgElement.dataset.photoCandidateIndex = String(nextIndex);
+            imgElement.style.opacity = '1';
+            imgElement.src = candidates[nextIndex];
+            return;
+        }
+
+        console.warn('[Katalog] Fotografie nenalezena, vyzkoušené cesty:', candidates);
+        // Všechny přípony selhaly – ukonči pokusy, ať nevznikne smyčka.
+        imgElement.onerror = null;
+        imgElement.removeAttribute('src');
+        imgElement.style.opacity = '1';
+
+        if (imgElement.classList.contains('gallery-thumb')) {
+            imgElement.style.display = 'none';
+            const missingPath = imgElement.dataset.originalPhotoPath;
+            if (missingPath && imgElement.dataset.renderToken === String(detailPhotoRenderToken)) {
+                removeUnavailableDetailPhoto(missingPath);
+            }
+        } else if (imgElement.id === 'lightbox-img') {
+            // Při chybě snímku pokračuj na další existující fotografii.
+            const missingPath = imgElement.dataset.originalPhotoPath;
+            if (missingPath) removeUnavailableDetailPhoto(missingPath);
+        } else if (imgElement.id === 'hero-img') {
+            imgElement.alt = 'Fotografii se nepodařilo načíst';
+            imgElement.style.visibility = 'hidden';
+        } else {
+            // U náhledů v katalogu zobraz neutrální prázdné místo, ne tmavý obrázek.
+            imgElement.style.visibility = 'hidden';
+        }
+    }
+
+
+
+    function parseDate(item) {
+        const d = item["Datum pořízení"];
+        if (!d) return new Date(0);
+        const parsed = new Date(d);
+        return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+    }
+
+    function getItemCode(item, index) {
+        if (!item) return "M-001";
+        if (item._jsonKey && String(item._jsonKey).startsWith("M-")) return String(item._jsonKey);
+        if (item._jsonKey && !isNaN(item._jsonKey)) return "M-" + String(item._jsonKey).padStart(3, '0');
+        for (let key in item) {
+            const cleanKey = key.toLowerCase().trim();
+            if ((cleanKey.includes("kód") || cleanKey === "id" || cleanKey.includes("označení")) && !cleanKey.includes("expedice")) {
+                if (item[key] && item[key] !== "null") {
+                    let val = String(item[key]).trim();
+                    if (!val.startsWith("M-") && !isNaN(val)) val = "M-" + val.padStart(3, '0');
+                    return val;
+                }
+            }
+        }
+        return "M-" + String(index + 1).padStart(3, '0');
+    }
+
+    function getCodeNumber(item, index) {
+        const codeStr = getItemCode(item, index);
+        const numMatch = codeStr.match(/\d+/);
+        return numMatch ? parseInt(numMatch[0], 10) : 0;
+    }
+
+
+
+
+
+
+
+    function shareOnWhatsApp() {
+        if (!currentSelectedItem) return;
+        const code = getItemCode(currentSelectedItem, currentSelectedItem._originalIndex);
+        const title = getItemName(currentSelectedItem);
+        const steel = currentSelectedItem["Mat. čepele / hlavní části"] || currentSelectedItem["Mat. čepele"] || "-";
+        const hrc = currentSelectedItem["Tvrdost HRC"] || currentSelectedItem["Tvrdost"] || "-";
+        const len = currentSelectedItem["Délka čepele / délka hlavní části mm"] ? (currentSelectedItem["Délka čepele / délka hlavní části mm"] + " mm") : "-";
+
+        const text = `🔪 *${code}: ${title}*\n` +
+                     `• Ocel: ${steel}\n` +
+                     `• Tvrdost: ${hrc} HRC\n` +
+                     `• Délka čepele: ${len}\n` +
+                     `Odkaz v katalogu: https://mirole04-ux.github.io/katalog/?id=${code.replace(/[^0-9]/g, '')}`;
+
+        const whatsappUrl = "https://api.whatsapp.com/send?text=" + encodeURIComponent(text);
+        window.open(whatsappUrl, '_blank');
+    }
+
+    function getItemName(item) {
+        return item["Název zkrácený-hlavní"] || item["Název nože"] || item["Název úplný"] || "Artefakt";
+    }
+
+    function getItemCategory(item) {
+        return item["Kategorie_styl"] || item["Kategorie"] || "Bez kategorie";
+    }
+
+    function getItemCollection(item) {
+        for (let k in item) {
+            if (k.toLowerCase().includes("kolekce")) {
+                if (item[k] && item[k] !== "null") return String(item[k]).trim();
+            }
+        }
+        return item["Status ve sbírce"] || "";
+    }
+
+    function getAllPhotos(item) {
+        let photos = [];
+        if (!item) return photos;
+
+        const mainPhotoKeys = ["Foto hlavní", "Fotky (Galerie)", "Foto", "Obrázek", "Foto galérie"];
+        for (const key of mainPhotoKeys) {
+            const value = item[key];
+            if (value && String(value).trim() && String(value).trim().toLowerCase() !== "null") {
+                photos.push(...String(value).split(/[;,\n]/).map(p => p.trim()).filter(Boolean));
+            }
+        }
+
+        if (photos.length === 0) {
+            const code = getItemCode(item, item._originalIndex || 0).replace(/^#/, '').trim();
+            // Každý název je samostatná fotka; setImageSource pak vyzkouší
+            // jpg/jpeg/png/webp/avif a varianty velikosti písmen.
+            photos.push(`foto/${code}`);
+            'abcdefghijklmnopqrstuvwxyz'.split('').forEach(suf => photos.push(`foto/${code}${suf}`));
+        }
+
+        return [...new Set(photos)];
+    }
+
+
+
+    // Nástroje sbírky. Oblíbené jsou pouze v tomto prohlížeči; katalog.json se nemění.
+    const favoriteCodes = new Set(JSON.parse(localStorage.getItem('catalog-favorites-v1') || '[]'));
+    function toggleFavorite(index){
+        const item=allItems[index];if(!item)return;
+        const code=getItemCode(item,index);
+        if(favoriteCodes.has(code))favoriteCodes.delete(code);else favoriteCodes.add(code);
+        localStorage.setItem('catalog-favorites-v1',JSON.stringify([...favoriteCodes]));
+        renderDashboardGrid();
+    }
+    function catalogDate(item){
+        const raw=catalogField(item,['Datum pořízení','Datum_pořízení']);
+        const m=raw.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
+        if(m)return new Date(+m[3],+m[2]-1,+m[1]);
+        const y=raw.match(/(?:19|20)\d{2}/);
+        if(y)return new Date(+y[0],0,1);
+        return null;
+    }
+    function toolEl(tag,txt,cls){const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e;}
+    function toolButton(text,fn){const b=toolEl('button',text);b.type='button';b.onclick=fn;return b;}
+    function toolRow(container,title,subtitle,onclick){
+        const d=toolEl('div',undefined,'tool-row');d.append(toolEl('strong',title));
+        if(subtitle)d.append(toolEl('small',subtitle));
+        if(onclick){d.style.cursor='pointer';d.onclick=onclick;}
+        container.append(d);
+    }
+    function openCollectionTool(mode){
+        const title=document.getElementById('collection-tool-title');
+        const body=document.getElementById('collection-tool-body');
+        body.replaceChildren();
+        if(mode==='audit'){
+            title.textContent='🔎 Kontrola úplnosti databáze';
+            body.append(toolEl('p','Kontroluji vyplněné údaje a duplicity kódů. Fotografie na serveru se zde neověřují; kontrola obrázků je samostatný krok.'));
+            const issues=[];const codes=new Set();
+            allItems.forEach((item,i)=>{
+                const code=getItemCode(item,i),missing=[];
+                if(codes.has(code))missing.push('Duplicitní kód');codes.add(code);
+                if(!getItemName(item)||getItemName(item)==='Artefakt')missing.push('Název');
+                if(!catalogField(item,['Země původu']))missing.push('Země původu');
+                if(!catalogField(item,['Země získání']))missing.push('Země získání');
+                if(!catalogField(item,['Datum pořízení']))missing.push('Datum pořízení');
+                if(!catalogField(item,['Mat. čepele / hlavní části','Ocel / Materiál']))missing.push('Materiál čepele');
+                if(!catalogField(item,['Délka čepele / délka hlavní části mm']))missing.push('Délka čepele');
+                if(!catalogField(item,['Fotky (Galerie)','Foto hlavní','Foto']))missing.push('Cesty fotografií nejsou výslovně uvedeny (použije se automatické hledání)');
+                if(missing.length)issues.push({code,name:getItemName(item),missing});
+            });
+            body.append(toolEl('p',`Položek ke kontrole: ${issues.length} z ${allItems.length}. Upozornění nemusí znamenat chybu.`));
+            const actions=toolEl('div',undefined,'tool-actions');
+            actions.append(toolButton('⬇ Export kontroly CSV',()=>{
+                const rows=[['Kód','Název','Upozornění'],...issues.map(x=>[x.code,x.name,x.missing.join('; ')])];
+                const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+                downloadCatalogText('kontrola_katalogu.csv',csv,'text/csv;charset=utf-8');
+            }));body.append(actions);
+            const list=toolEl('div',undefined,'tool-list');
+            issues.forEach(x=>toolRow(list,x.code+' — '+x.name,x.missing.join(' · ')));body.append(list);
+        }else if(mode==='timeline'){
+            title.textContent='🕒 Časová osa sbírky';
+            const entries=allItems.map((item,i)=>({item,i,date:catalogDate(item)})).filter(x=>x.date&&!isNaN(x.date)).sort((a,b)=>b.date-a.date);
+            body.append(toolEl('p',`${entries.length} předmětů s rozpoznaným datem pořízení.`));
+            const list=toolEl('div',undefined,'tool-list');
+            let lastYear='';entries.forEach(x=>{
+                const year=x.date.getFullYear();if(year!==lastYear){list.append(toolEl('h3',String(year)));lastYear=year;}
+                toolRow(list,getItemCode(x.item,x.i)+' — '+getItemName(x.item),catalogField(x.item,['Datum pořízení'])+' · '+catalogField(x.item,['Země získání','Místo_pořízení_detail']),()=>{closeNavigationModal('collection-tool-modal');showDetail(x.i,true);});
+            });body.append(list);
+        }else if(mode==='stats'){
+            title.textContent='📊 Statistiky sbírky';
+            const groups=[['Země původu',i=>catalogField(i,['Země původu'])],['Země získání',i=>catalogField(i,['Země získání'])],['Výrobce',i=>catalogField(i,['Výrobce'])],['Kategorie',getItemCategory]];
+            groups.forEach(([name,get])=>{
+                body.append(toolEl('h3',name));const counts=new Map();
+                allItems.forEach(i=>{const val=get(i)||'Neuvedeno';counts.set(val,(counts.get(val)||0)+1);});
+                const entries=[...counts].sort((a,b)=>b[1]-a[1]);const max=entries[0]?.[1]||1;
+                entries.slice(0,12).forEach(([label,n])=>{
+                    const line=toolEl('div',undefined,'tool-chart');line.append(toolEl('span',label));
+                    const bar=toolEl('div',undefined,'bar');const fill=toolEl('span');fill.style.width=(100*n/max)+'%';bar.append(fill);line.append(bar,toolEl('b',String(n)));body.append(line);
+                });
+            });
+        }else if(mode==='favorites'){
+            title.textContent='★ Moje oblíbené exponáty';
+            body.append(toolEl('p','Oblíbené ukládám jen do tohoto prohlížeče. Nepřenášejí se automaticky na jiný telefon.'));
+            const list=toolEl('div',undefined,'tool-list');
+            allItems.forEach((item,i)=>{if(favoriteCodes.has(getItemCode(item,i)))toolRow(list,getItemCode(item,i)+' — '+getItemName(item),getItemCategory(item),()=>{closeNavigationModal('collection-tool-modal');showDetail(i,true);});});
+            if(!list.children.length)list.append(toolEl('p','Zatím žádné oblíbené. Označ hvězdičkou na kartě předmětu.'));
+            body.append(list);
+        }else if(mode==='new'){
+            title.textContent='＋ Připravit nový záznam';
+            body.append(toolEl('p','Vytvoří se soubor JSON pro ruční doplnění do katalog.json. Nic se samo neukládá na GitHub ani nepřepisuje existující záznamy.'));
+            const form=toolEl('form',undefined,'tool-form');
+            const fields=[['code','Kód (např. M-062)','text'],['name','Název','text'],['maker','Výrobce','text'],['cat','Kategorie','text'],['origin','Země původu','text'],['acquired','Země získání','text'],['date','Datum pořízení (DD. MM. RRRR)','text'],['steel','Materiál čepele','text'],['blade','Délka čepele (mm)','number'],['note','Příběh / popis','textarea']];
+            const refs={};fields.forEach(([key,label,type])=>{const wrap=toolEl('label',label);const input=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.required=key==='code'||key==='name';wrap.append(input);if(key==='note')wrap.classList.add('full');form.append(wrap);refs[key]=input;});
+            const submit=toolButton('⬇ Stáhnout JSON záznam',()=>{});submit.type='submit';submit.className='full';form.append(submit);
+            form.onsubmit=ev=>{ev.preventDefault();const v=k=>refs[k].value.trim();const code=v('code');if(!/^M-\d{3,}$/.test(code)){alert('Kód musí mít tvar M-062.');return;}
+                if(allItems.some((item,i)=>getItemCode(item,i)===code)){alert('Tento kód již v katalogu existuje.');return;}
+                const obj={'Název zkrácený-hlavní':v('name'),'Výrobce':v('maker'),'Kategorie_styl':v('cat'),'Země původu':v('origin'),'Země získání':v('acquired'),'Datum pořízení':v('date'),'Mat. čepele / hlavní části':v('steel'),'Délka čepele / délka hlavní části mm':v('blade'),'Detailní_popis_Příběh':v('note'),'Fotky (Galerie)':null};
+                downloadCatalogText(code+'.json',JSON.stringify({[code]:obj},null,2),'application/json');
+            };body.append(form);
+        }
+        openNavigationModal('collection-tool-modal');
+    }
+    function downloadCatalogText(filename,content,mime){
+        const blob=new Blob([content],{type:mime});const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+
+    // Porovnání je čistě lokální a nemění katalog.json.
+    const comparedIndices = new Set();
+    function getPersonalRating(item) {
+        const raw=catalogField(item,['Osobní hodnocení','Osobní_hodnocení','Osobní hodnocení (1-10)']);
+        const num=Number(String(raw).replace(',','.').match(/\d+(?:\.\d+)?/)?.[0]);
+        return Number.isFinite(num) ? num : -1;
+    }
+    function toggleCompareItem(index) {
+        if(comparedIndices.has(index)) comparedIndices.delete(index);
+        else if(comparedIndices.size<4) comparedIndices.add(index);
+        else {alert('Lze porovnat nejvýše 4 předměty.');return;}
+        updateCompareBar();
+    }
+    function updateCompareBar() {
+        const bar=document.getElementById('compare-bar');
+        const count=document.getElementById('compare-count');
+        if(bar)bar.style.display=comparedIndices.size?'flex':'none';
+        if(count)count.textContent=String(comparedIndices.size);
+        document.querySelectorAll('[data-compare-index]').forEach(btn=>{
+            const chosen=comparedIndices.has(Number(btn.dataset.compareIndex));
+            btn.textContent=chosen?'✓ Vybráno':'⚖️ Porovnat';
+            btn.classList.toggle('selected',chosen);
+        });
+    }
+    function openCompareModal() {
+        if(comparedIndices.size<2){alert('Vyber alespoň dva předměty.');return;}
+        const selected=[...comparedIndices].map(i=>allItems[i]).filter(Boolean);
+        const fields=[
+          ['ZÁKLADNÍ INFORMACE',null],
+          ['Výrobce',i=>catalogField(i,['Výrobce','Výrobce nože/značka'])],
+          ['Upřesnění výrobce',i=>catalogField(i,['Výrobce upřesnění'])],
+          ['Země původu',i=>catalogField(i,['Země původu'])],
+          ['Kategorie',getItemCategory],
+          ['Konstrukce',i=>catalogField(i,['Konstrukce_typ','Konstrukce typ'])],
+          ['Osobní hodnocení',i=>getPersonalRating(i)>=0?String(getPersonalRating(i)):'—'],
+          ['ČEPEL A MATERIÁLY',null],
+          ['Materiál čepele',i=>catalogField(i,['Mat. čepele / hlavní části','Mat. čepele / hlavní části:','Mat. čepele','Ocel / Materiál'])],
+          ['Materiál rukojeti',i=>catalogField(i,['Mat. rukojeti / držadla','Mat. rukojeti / držadla:'])],
+          ['Pouzdro / pochva',i=>catalogField(i,['Pouzdro / pochva / obal','Pouzdro / pochva / obal:','Pouzdro'])],
+          ['Typ čepele / profil',i=>catalogField(i,['Typ čepele / tvar / profil'])],
+          ['Výbrus',i=>catalogField(i,['Výbrus / profil'])],
+          ['Tvrdost HRC',i=>catalogField(i,['Tvrdost HRC','Tvrdost'])],
+          ['Typ konstrukce',i=>catalogField(i,['Typ konstrukce'])],
+          ['Pojistka',i=>catalogField(i,['Typ pojistky'])],
+          ['ROZMĚRY A HMOTNOST',null],
+          ['Délka čepele / hlavní části (mm)',i=>catalogField(i,['Délka čepele / délka hlavní části mm'])],
+          ['Celková délka (mm)',i=>catalogField(i,['Celková délka mm'])],
+          ['Délka rukojeti (mm)',i=>catalogField(i,['Délka rukojeti mm'])],
+          ['Tloušťka čepele (mm)',i=>catalogField(i,['Tloušťka čepele mm'])],
+          ['Výška / šířka (mm)',i=>catalogField(i,['Výška / šířka mm'])],
+          ['Hmotnost (g)',i=>catalogField(i,['Hmotnost g'])],
+          ['OSTATNÍ TECHNICKÉ ÚDAJE',null],
+          ['Další údaje',i=>catalogField(i,['Ostatní údaje'])]
+        ];
+        const table=document.getElementById('compare-table');table.replaceChildren();
+        const header=document.createElement('tr');const first=document.createElement('th');first.textContent='Parametr';header.appendChild(first);
+        selected.forEach(i=>{const th=document.createElement('th');th.textContent=getItemName(i);header.appendChild(th);});table.appendChild(header);
+        fields.forEach(([label,fn])=>{const tr=document.createElement('tr');if(!fn){tr.className='compare-section-row';const th=document.createElement('th');th.colSpan=selected.length+1;th.textContent=label;tr.appendChild(th);}else{const th=document.createElement('th');th.textContent=label;tr.appendChild(th);selected.forEach(i=>{const td=document.createElement('td');td.textContent=fn(i)||'—';tr.appendChild(td);});}table.appendChild(tr);});
+        document.getElementById('compare-modal').style.display='flex';
+    }
+    function renderAcquisitionStory(item) {
+        const story=catalogField(item,['Příběh_Získání','Příběh získání','Příběh_Ziskani','Příběh pořízení']);
+        const sec=document.getElementById('acquisition-story-section');
+        sec.style.display=story?'block':'none';
+        if(story)document.getElementById('acquisition-story').textContent=story;
+    }
+    function renderRelatedItems(item) {
+        const sec=document.getElementById('related-items-section');const wrap=document.getElementById('related-items');
+        wrap.replaceChildren();
+        const country=catalogField(item,['Země původu']).toLocaleLowerCase('cs');
+        const maker=catalogField(item,['Výrobce','Výrobce nože/značka']).toLocaleLowerCase('cs');
+        const category=getItemCategory(item).toLocaleLowerCase('cs');
+        const matches=allItems.filter(other=>other!==item).map(other=>{
+            let score=0;
+            if(maker && catalogField(other,['Výrobce','Výrobce nože/značka']).toLocaleLowerCase('cs')===maker)score+=3;
+            if(country && catalogField(other,['Země původu']).toLocaleLowerCase('cs')===country)score+=2;
+            if(category && getItemCategory(other).toLocaleLowerCase('cs')===category)score+=1;
+            return {other,score};
+        }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,4);
+        sec.style.display=matches.length?'block':'none';
+        matches.forEach(({other})=>{
+            const button=document.createElement('button');button.type='button';button.className='related-card';
+            const title=document.createElement('strong');title.textContent=getItemName(other);button.appendChild(title);
+            const info=document.createElement('small');info.textContent=catalogField(other,['Země původu'])+' · '+getItemCategory(other);button.appendChild(info);
+            button.onclick=()=>showDetail(other._originalIndex,true);wrap.appendChild(button);
+        });
+    }
+
+    function catalogField(item, names) {
+        for (const name of names) {
+            const value = item[name];
+            if (value !== undefined && value !== null && String(value).trim() && String(value).toLowerCase() !== 'null') return String(value).trim();
+        }
+        return '';
+    }
+
+    function toggleAdvancedFilters() {
+        const panel = document.getElementById('advanced-filter-panel');
+        const btn = document.getElementById('advanced-toggle');
+        const expanded = panel.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(expanded));
+        btn.textContent = expanded ? '⚙️ Pokročilé filtrování ▴' : '⚙️ Pokročilé filtrování ▾';
+    }
+
+    function resetCatalogFilters() {
+        ['search-input','steel-filter'].forEach(id => {const e=document.getElementById(id);if(e)e.value='';});
+        ['collection-filter','category-filter','country-filter','acquired-country-filter','maker-filter','status-filter'].forEach(id => {const e=document.getElementById(id);if(e)e.value='';});
+        const sort=document.getElementById('sort-select');if(sort)sort.value='code-asc';
+        filterItems();
+    }
+
+    function updateCollectionHighlights() {
+        const countries = new Set();
+        const acquired = new Set();
+        allItems.forEach(item => {
+            const c=catalogField(item,['Země původu','Země_původu']);
+            if(c)countries.add(c.toLocaleLowerCase('cs'));
+            const a=catalogField(item,['Země získání','Země_získání']);
+            if(a)acquired.add(a.toLocaleLowerCase('cs'));
+        });
+        const count=document.getElementById('highlight-count');if(count)count.textContent=allItems.length;
+        const land=document.getElementById('highlight-countries');if(land)land.textContent=countries.size;
+        const acquiredEl=document.getElementById('highlight-acquired');if(acquiredEl)acquiredEl.textContent=acquired.size;
+    }
+
+    function populateFilterDropdowns() {
+        const catSelect = document.getElementById('category-filter');
+        const colSelect = document.getElementById('collection-filter');
+        if (!catSelect || !colSelect) return;
+
+        const categoriesMap = {};
+        const collectionsMap = {};
+
+        allItems.forEach(item => {
+            const rawCat = getItemCategory(item);
+            if (rawCat && rawCat !== "Bez kategorie") {
+                rawCat.split(/[,/;\n]+/).map(c => c.trim()).filter(c => c).forEach(c => categoriesMap[c] = (categoriesMap[c] || 0) + 1);
+            }
+            const rawCol = getItemCollection(item);
+            if (rawCol) {
+                rawCol.split(/[,/;\n]+/).map(c => c.trim()).filter(c => c).forEach(c => collectionsMap[c] = (collectionsMap[c] || 0) + 1);
+            }
+        });
+
+        catSelect.innerHTML = '<option value="">Všechny kategorie</option>';
+        Object.keys(categoriesMap).sort().forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.innerText = `${cat} (${categoriesMap[cat]})`;
+            catSelect.appendChild(opt);
+        });
+
+        colSelect.innerHTML = '<option value="">Všechny kolekce</option>';
+        Object.keys(collectionsMap).sort().forEach(col => {
+            const opt = document.createElement('option');
+            opt.value = col;
+            opt.innerText = `${col} (${collectionsMap[col]})`;
+            colSelect.appendChild(opt);
+        });
+    }
+
+    function populateAdvancedFilters() {
+        const configs = [
+            ['country-filter',['Země původu','Země_původu'],'Všechny země původu'],
+            ['acquired-country-filter',['Země získání','Země_získání'],'Všechny země získání'],
+            ['maker-filter',['Výrobce','Výrobce nože/značka'],'Všichni výrobci'],
+            ['status-filter',['Status ve sbírce','Stav_předmětu','Stav předmětu'],'Všechny stavy']
+        ];
+        configs.forEach(([id,keys,placeholder]) => {
+            const el=document.getElementById(id);if(!el)return;
+            const values=new Set(allItems.map(item=>catalogField(item,keys)).filter(Boolean));
+            el.replaceChildren(new Option(placeholder,''));
+            [...values].sort((a,b)=>a.localeCompare(b,'cs')).forEach(v=>el.add(new Option(v,v)));
+        });
+        updateCollectionHighlights();
+    }
+
+
+
+
+
+    function filterItems() {
+        const queryInput = document.getElementById('search-input');
+        const catInput = document.getElementById('category-filter');
+        const colInput = document.getElementById('collection-filter');
+        const sortInput = document.getElementById('sort-select');
+
+        const query = queryInput ? queryInput.value.toLowerCase().trim() : '';
+        const category = catInput ? catInput.value.toLowerCase() : '';
+        const selectedCollection = colInput ? colInput.value.toLowerCase().trim() : '';
+        const sortOption = sortInput ? sortInput.value : 'code-asc';
+        const extraValue = id => (document.getElementById(id)?.value || '').toLocaleLowerCase('cs').trim();
+        const country = extraValue('country-filter');
+        const acquiredCountry = extraValue('acquired-country-filter');
+        const makerFilter = extraValue('maker-filter');
+        const steelFilter = extraValue('steel-filter');
+        const status = extraValue('status-filter');
+
+        filteredItems = allItems.filter(item => {
+            const itemCat = getItemCategory(item).toLowerCase();
+            const matchesCategory = !category || itemCat.includes(category);
+            const itemCol = getItemCollection(item).toLowerCase();
+            const matchesCollection = !selectedCollection || itemCol.includes(selectedCollection);
+            
+            const name = getItemName(item).toLowerCase();
+            const steel = (item["Mat. čepele / hlavní části"] || item["Mat. čepele"] || "").toLowerCase();
+            const maker = (item["Výrobce"] || item["Výrobce nože/značka"] || "").toLowerCase();
+            const desc = (item["Detailní_popis_Příběh"] || item["Popis"] || "").toLowerCase();
+
+            const matchesQuery = !query || name.includes(query) || steel.includes(query) || maker.includes(query) || desc.includes(query);
+
+            const countryValue = catalogField(item,['Země původu','Země_původu']).toLocaleLowerCase('cs');
+            const acquiredCountryValue = catalogField(item,['Země získání','Země_získání']).toLocaleLowerCase('cs');
+            const makerValue = catalogField(item,['Výrobce','Výrobce nože/značka']).toLocaleLowerCase('cs');
+            const statusValue = catalogField(item,['Status ve sbírce','Stav_předmětu','Stav předmětu']).toLocaleLowerCase('cs');
+            const extraMatches = (!country || countryValue === country) && (!acquiredCountry || acquiredCountryValue === acquiredCountry) && (!makerFilter || makerValue === makerFilter)
+                && (!steelFilter || steel.includes(steelFilter)) && (!status || statusValue === status)
+;
+            if (!extraMatches) return false;
+            return matchesCategory && matchesCollection && matchesQuery;
+        });
+
+        filteredItems.sort((a, b) => {
+            if (sortOption === "code-desc") return getCodeNumber(b, b._originalIndex) - getCodeNumber(a, a._originalIndex);
+            if (sortOption === "date-desc") return parseDate(b) - parseDate(a);
+            if (sortOption === "date-asc") return parseDate(a) - parseDate(b);
+            if (sortOption === "name-asc") return getItemName(a).localeCompare(getItemName(b));
+            if (sortOption === "rating-desc") return getPersonalRating(b)-getPersonalRating(a);
+            if (sortOption === "rating-asc") return getPersonalRating(a)-getPersonalRating(b);
+            return getCodeNumber(a, a._originalIndex) - getCodeNumber(b, b._originalIndex);
+        });
+
+        renderDashboardGrid();
+    }
+
+    let collectionView = localStorage.getItem('collection-view') === 'gallery' ? 'gallery' : 'catalog';
+    function setCollectionView(mode) {
+        collectionView = mode === 'gallery' ? 'gallery' : 'catalog';
+        localStorage.setItem('collection-view', collectionView);
+        document.getElementById('view-catalog')?.classList.toggle('active',collectionView==='catalog');
+        document.getElementById('view-gallery')?.classList.toggle('active',collectionView==='gallery');
+        document.getElementById('items-grid')?.classList.toggle('gallery-mode',collectionView==='gallery');
+    }
+    function renderDashboardGrid() {
+        setCollectionView(collectionView);
+        const grid = document.getElementById('items-grid');
+        const stats = document.getElementById('dashboard-stats');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+
+
+        if (filteredItems.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #888; padding: 30px;">Žádný artefakt neodpovídá filtru.</div>';
+            return;
+        }
+
+        filteredItems.forEach(item => {
+            const code = getItemCode(item, item._originalIndex);
+            const title = getItemName(item);
+            const photos = getAllPhotos(item);
+            const cat = getItemCategory(item);
+
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            card.onclick = () => showDetail(item._originalIndex, true);
+
+            let imgHTML = photos.length > 0 ? `<img class="item-card-img" data-photo-path="${photos[0]}" loading="lazy" alt="">` : `<span class="no-photo-placeholder">Bez fotky</span>`;
+
+
+            card.innerHTML = `
+                <div class="item-card-img-wrap">${imgHTML}</div>
+                <div class="item-card-body">
+                    <button type="button" class="compare-card-btn" data-compare-index="${item._originalIndex}" title="Přidat do porovnání">⚖️ Porovnat</button>
+                    <div class="item-card-code">${code.startsWith('#') ? code : '#' + code}</div>
+                    <div class="item-card-title">${title}</div>
+                    <div class="item-card-meta">${cat}</div>
+                </div>
+            `;
+            const favoriteBtn=document.createElement('button');
+            favoriteBtn.className='favorite-toggle'+(favoriteCodes.has(code)?' active':'');
+            favoriteBtn.type='button';favoriteBtn.textContent=favoriteCodes.has(code)?'★':'☆';
+            favoriteBtn.title='Přepnout oblíbený exponát';
+            favoriteBtn.onclick=ev=>{ev.stopPropagation();toggleFavorite(item._originalIndex);};
+            card.append(favoriteBtn);
+            card.querySelector('.compare-card-btn').onclick = (event) => {event.stopPropagation();toggleCompareItem(item._originalIndex);};
+            grid.appendChild(card);
+            const cardImg = card.querySelector('.item-card-img');
+            if (cardImg) setImageSource(cardImg, cardImg.dataset.photoPath);
+        });
+    }
+
+    function showDashboard() {
+        const dash = document.getElementById('dashboard-view');
+        const det = document.getElementById('detail-view');
+        if (dash) dash.style.display = 'block';
+        if (det) det.style.display = 'none';
+    }
+
+    function showDetail(index, pushHistory = true) {
+        currentSelectedItem = allItems[index];
+        if (!currentSelectedItem) return;
+
+        renderSelectedItem(currentSelectedItem, index);
+
+        const dash = document.getElementById('dashboard-view');
+        const det = document.getElementById('detail-view');
+        if (dash) dash.style.display = 'none';
+        if (det) det.style.display = 'block';
+        window.scrollTo(0, 0);
+
+        if (pushHistory) {
+            history.pushState({ view: 'detail', index: index }, '', '#detail-' + index);
+        }
+    }
+
+    // Mobilní Zpět zavírá poslední otevřený dialog namísto opuštění aplikace.
+    const navigationModals = ['map-modal','compare-modal','hub-modal','settings-modal','lightbox-modal','qr-modal','collection-tool-modal'];
+    function visibleNavigationModal(){return navigationModals.find(id=>document.getElementById(id)?.style.display==='flex');}
+    function closeNavigationModal(id){
+        const el=document.getElementById(id); if(!el)return;
+        if(history.state?.view==='modal' && history.state.modal===id){history.back();}
+        else el.style.display='none';
+    }
+    function openNavigationModal(id){
+        const el=document.getElementById(id);if(!el)return;
+        if(el.style.display==='flex')return;
+        el.style.display='flex';
+        history.pushState({view:'modal',modal:id,underlying:history.state},'',location.href);
+    }
+    // Přepojení všech dialogů bez změny původního vykreslování map a tabulek.
+    const modalOpeners=[['openGlobalMapModal','map-modal'],['openCompareModal','compare-modal'],['openHubModal','hub-modal'],['openSettingsModal','settings-modal'],['openLightbox','lightbox-modal'],['showQRCode','qr-modal']];
+    // Hookování se provede až po načtení všech funkcí a dat.
+    function installModalNavigation(){
+        modalOpeners.forEach(([name,id])=>{
+            const original=window[name];if(typeof original!=='function'||original._navWrapped)return;
+            const wrapped=function(...args){
+                const wasOpen=document.getElementById(id)?.style.display==='flex';
+                const result=original.apply(this,args);
+                if(!wasOpen && document.getElementById(id)?.style.display==='flex'){
+                    history.pushState({view:'modal',modal:id,underlying:history.state},'',location.href);
+                }
+                return result;
+            };wrapped._navWrapped=true;window[name]=wrapped;
+        });
+        [['closeGlobalMapModal','map-modal'],['closeHubModal','hub-modal'],['closeSettingsModal','settings-modal'],['closeLightbox','lightbox-modal'],['hideQRCode','qr-modal']].forEach(([name,id])=>{
+            if(typeof window[name]==='function')window[name]=()=>closeNavigationModal(id);
+        });
+        const closeCompare=document.querySelector('#compare-modal .close-btn');
+        if(closeCompare)closeCompare.onclick=()=>closeNavigationModal('compare-modal');
+    }
+    window.addEventListener('popstate', (event) => {
+        const opened=visibleNavigationModal();
+        if(opened)document.getElementById(opened).style.display='none';
+        if(event.state?.view==='modal'){
+            const underlying=event.state.underlying;
+            if(underlying?.view==='detail')showDetail(underlying.index,false);
+            else showDashboard();
+            const modal=document.getElementById(event.state.modal);
+            if(modal)modal.style.display='flex';
+            return;
+        }
+        if (event.state && event.state.view === 'detail') {
+            showDetail(event.state.index, false);
+        } else {
+            showDashboard();
+        }
+    });
+
+    function extractArrayFromData(data) {
+        if (Array.isArray(data)) return data;
+        if (typeof data === 'object' && data !== null) {
+            const keys = Object.keys(data);
+            if (keys.length === 1 && typeof data[keys[0]] === 'object') return extractArrayFromData(data[keys[0]]);
+            return Object.keys(data).map(key => ({ _jsonKey: key, ...data[key] }));
+        }
+        return [];
+    }
+
+    function initCatalog(data) {
+        try {
+            const list = extractArrayFromData(data);
+            const forbidden = /(?:^cena$|^cena kč$|údržb|servis|ostření|olejov|náklad|finan|invest|hesl|token|soukrom|^poznámk)/i;
+            for (const item of list) {
+                for (const key of Object.keys(item)) {
+                    if (forbidden.test(key)) throw new Error('Databáze obsahuje neveřejné pole. Zobrazení bylo z bezpečnostních důvodů zastaveno.');
+                }
+            }
+            allItems = list.map((item, idx) => ({ ...item, _originalIndex: idx }));
+            
+            filteredItems = [...allItems];
+            populateFilterDropdowns();
+            populateAdvancedFilters();
+                filterItems();
+            installModalNavigation();
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const reqId = urlParams.get('id');
+
+            if (reqId) {
+                isDirectQRMode = true;
+                const foundIndex = allItems.findIndex((item, idx) => {
+                    const code = getItemCode(item, idx).replace(/[^0-9]/g, '');
+                    const searchId = reqId.replace(/[^0-9]/g, '');
+                    return code === searchId || String(item._jsonKey) === String(reqId);
+                });
+
+                if (foundIndex !== -1) {
+                    showDetail(foundIndex, false);
+                    const backBtn = document.getElementById('back-to-dashboard-btn');
+                    const qrBtn = document.getElementById('qr-btn');
+                    if (backBtn) backBtn.style.display = 'none';
+                    if (qrBtn) qrBtn.style.display = 'none';
+                }
+            } else {
+                history.replaceState({ view: 'dashboard' }, '', window.location.pathname);
+            }
+        } catch(e) {
+            showError("Chyba při zpracování dat: " + e.message);
+        }
+    }
+
+    function toggleFullPassport() {
+        const container = document.getElementById('full-passport-container');
+        if (container) container.style.display = (container.style.display === 'none') ? 'block' : 'none';
+    }
+
+    function renderFullPassport(item) {
+        const passportGrid = document.getElementById('full-passport-rows');
+        if (!passportGrid) return;
+        passportGrid.innerHTML = '';
+
+        for (let key in item) {
+            if (key.startsWith('_') || item[key] === null || item[key] === undefined || item[key] === "" || item[key] === "null") continue;
+
+            let val = item[key];
+            if (key.toLowerCase().includes('tloušťka')) {
+                let cleaned = cleanThicknessValue(val);
+                val = cleaned ? cleaned + " mm" : "-";
+            } else if (typeof val === 'string' && val.includes('T') && val.endsWith('Z')) {
+                val = formatDate(val);
+            }
+
+            const row = document.createElement('div');
+            row.className = 'detail-row';
+            row.style.fontSize = '12px';
+            row.innerHTML = `<span class="detail-label" style="color: var(--accent-color);">${key}:</span><span class="detail-value">${val}</span>`;
+            passportGrid.appendChild(row);
+        }
+    }
+
+    function renderSelectedItem(item, index) {
+        try {
+            const code = getItemCode(item, parseInt(index));
+            const name = getItemName(item);
+            const fullTitle = item["Název úplný"] || name;
+            const maker = item["Výrobce"] || item["Výrobce nože/značka"] || "";
+            const cat = getItemCategory(item);
+
+            safeSetText('item-id', code.startsWith('#') ? code : "#" + code);
+            safeSetText('item-title', fullTitle);
+            safeSetText('item-subtitle', maker + (maker && cat ? " • " : "") + cat);
+
+            safeSetText('spec-steel', item["Mat. čepele / hlavní části"] || item["Mat. čepele"]);
+            safeSetText('spec-hrc', (item["Tvrdost HRC"] || item["Tvrdost"]) ? ((item["Tvrdost HRC"] || item["Tvrdost"]) + " HRC") : null);
+            safeSetText('spec-construction', item["Konstrukce_typ"] || item["Druh zbraně"]);
+            safeSetText('spec-origin', item["Země původu"]);
+            safeSetText('origin-country', item["Země získání"] || item["Země původu"]);
+            safeSetText('origin-place', item["Místo_pořízení_detail"] || item["Kde byl pořízen"]);
+            safeSetText('origin-expedition', getItemCollection(item));
+            safeSetText('origin-year', formatDate(item["Datum pořízení"]));
+
+            safeSetText('item-description', item["Detailní_popis_Příběh"] || item["Krátký_popis_specifikace"] || item["Popis"] || "Bez popisu.");
+            renderAcquisitionStory(item);
+            renderRelatedItems(item);
+
+            safeSetText('tech-blade-len', item["Délka čepele / délka hlavní části mm"] ? (item["Délka čepele / délka hlavní části mm"] + " mm") : (item["Délka čepele cm"] ? (item["Délka čepele cm"] + " cm") : null));
+            
+            let cleanedThick = cleanThicknessValue(item["Tloušťka čepele mm"]);
+            safeSetText('tech-blade-thick', cleanedThick ? (cleanedThick + " mm") : null);
+
+            safeSetText('tech-total-len', item["Celková délka mm"] ? (item["Celková délka mm"] + " mm") : (item["Celková délka cm"] ? (item["Celková délka cm"] + " cm") : null));
+            safeSetText('tech-handle', item["Mat. rukojeti / držadla"] || item["Mat.rukojeti"]);
+            safeSetText('tech-sheath', item["Pouzdro / pochva / obal"] || item["Pouzdro"]);
+            safeSetText('tech-lock', item["Typ pojistky"]);
+
+            detailPhotoRenderToken++;
+            currentLightboxPhotos = getAllPhotos(item);
+            currentActivePhotoIndex = 0;
+
+            const mainImg = document.getElementById('hero-img');
+
+            if (mainImg) {
+                mainImg.style.visibility = 'visible';
+                if (currentLightboxPhotos.length > 0) {
+                    mainImg.dataset.originalPhotoPath = currentLightboxPhotos[0];
+                    setImageSource(mainImg, currentLightboxPhotos[0]);
+                }
+                else {
+                    mainImg.removeAttribute('src');
+                    mainImg.style.visibility = 'hidden';
+                }
+            }
+
+            const gallerySec = document.getElementById('gallery-section');
+            const galleryGrid = document.getElementById('gallery-grid');
+            if (galleryGrid) galleryGrid.innerHTML = '';
+
+            if (currentLightboxPhotos.length > 1 && galleryGrid) {
+                if (gallerySec) gallerySec.style.display = 'block';
+                currentLightboxPhotos.forEach((src, idx) => {
+                    const img = document.createElement('img');
+                    img.className = 'gallery-thumb' + (idx === 0 ? ' active' : '');
+                    img.dataset.originalPhotoPath = src;
+                    img.dataset.renderToken = String(detailPhotoRenderToken);
+                    img.loading = 'lazy';
+                    img.style.visibility = 'visible';
+                    setImageSource(img, src);
+                    img.onclick = function() {
+                        currentActivePhotoIndex = currentLightboxPhotos.indexOf(src);
+                        if (currentActivePhotoIndex < 0) return;
+                        if (mainImg) {
+                            mainImg.style.visibility = 'visible';
+                            mainImg.dataset.originalPhotoPath = src;
+                            setImageSource(mainImg, src);
+                        }
+                        document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+                        img.classList.add('active');
+                    };
+                    galleryGrid.appendChild(img);
+                });
+            } else {
+                if (gallerySec) gallerySec.style.display = 'none';
+            }
+
+            const passportWrapper = document.getElementById('full-passport-wrapper');
+
+            if (isDirectQRMode) {
+                if (passportWrapper) passportWrapper.style.display = 'none';
+            } else {
+                if (passportWrapper) {
+                    passportWrapper.style.display = 'block';
+                    renderFullPassport(item);
+                }
+            }
+
+        } catch(e) {
+            showError("Chyba při vykreslení položky: " + e.message);
+        }
+    }
+
+    // Odstranění neexistujících souborů z navigace i náhledů.
+    // Díky tomu galerie nikdy nepřejde na černý snímek za poslední fotografií.
+    function removeUnavailableDetailPhoto(path) {
+        const index = currentLightboxPhotos.indexOf(path);
+        if (index === -1) return;
+        currentLightboxPhotos.splice(index, 1);
+        if (index < currentActivePhotoIndex) currentActivePhotoIndex--;
+        if (index < currentLightboxIndex) currentLightboxIndex--;
+        currentActivePhotoIndex = Math.max(0, Math.min(currentActivePhotoIndex, currentLightboxPhotos.length - 1));
+        currentLightboxIndex = Math.max(0, Math.min(currentLightboxIndex, currentLightboxPhotos.length - 1));
+        document.querySelectorAll('.gallery-thumb').forEach(thumb => {
+            if (thumb.dataset.originalPhotoPath === path) thumb.remove();
+        });
+        const remaining = currentLightboxPhotos.length;
+        const section = document.getElementById('gallery-section');
+        if (section && remaining < 2) section.style.display = 'none';
+        if (!remaining) {
+            closeLightbox();
+            return;
+        }
+        const mainImg = document.getElementById('hero-img');
+        if (mainImg && mainImg.dataset.originalPhotoPath === path) {
+            mainImg.style.visibility = 'visible';
+            mainImg.dataset.originalPhotoPath = currentLightboxPhotos[0];
+            currentActivePhotoIndex = 0;
+            setImageSource(mainImg, currentLightboxPhotos[0]);
+        }
+        const modal = document.getElementById('lightbox-modal');
+        if (modal && modal.style.display === 'flex') updateLightboxImage();
+    }
+
+    function openLightbox(index) {
+        if (!currentLightboxPhotos.length) return;
+        currentLightboxIndex = ((Number(index) || 0) % currentLightboxPhotos.length + currentLightboxPhotos.length) % currentLightboxPhotos.length;
+        document.getElementById('lightbox-modal').style.display = 'flex';
+        updateLightboxImage();
+    }
+
+    function updateLightboxImage() {
+        if (!currentLightboxPhotos.length) return closeLightbox();
+        currentLightboxIndex = ((currentLightboxIndex % currentLightboxPhotos.length) + currentLightboxPhotos.length) % currentLightboxPhotos.length;
+        const lightImg = document.getElementById('lightbox-img');
+        const path = currentLightboxPhotos[currentLightboxIndex];
+        if (!lightImg || !path) return;
+        lightImg.style.visibility = 'visible';
+        lightImg.dataset.originalPhotoPath = path;
+        setImageSource(lightImg, path);
+    }
+
+    function prevLightboxImg() {
+        if (!currentLightboxPhotos.length) return;
+        currentLightboxIndex = (currentLightboxIndex - 1 + currentLightboxPhotos.length) % currentLightboxPhotos.length;
+        updateLightboxImage();
+    }
+
+    function nextLightboxImg() {
+        if (!currentLightboxPhotos.length) return;
+        currentLightboxIndex = (currentLightboxIndex + 1) % currentLightboxPhotos.length;
+        updateLightboxImage();
+    }
+
+    function closeLightbox() { document.getElementById('lightbox-modal').style.display = 'none'; }
+
+    const lightboxModal = document.getElementById('lightbox-modal');
+    lightboxModal.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
+    lightboxModal.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        if (touchEndX < touchStartX - 40) nextLightboxImg();
+        if (touchEndX > touchStartX + 40) prevLightboxImg();
+    }, {passive: true});
+    document.addEventListener('keydown', e => {
+        if (lightboxModal.style.display !== 'flex') return;
+        if (e.key === 'ArrowRight') nextLightboxImg();
+        else if (e.key === 'ArrowLeft') prevLightboxImg();
+        else if (e.key === 'Escape') closeLightbox();
+    });
+
+    function showQRCode() {
+        if (!currentSelectedItem) return;
+        const code = getItemCode(currentSelectedItem, currentSelectedItem._originalIndex);
+        const cleanId = code.replace(/[^0-9]/g, '');
+        const title = getItemName(currentSelectedItem);
+        
+        safeSetText('qr-code-text', code.startsWith('#') ? code : "#" + code);
+        safeSetText('qr-title', title);
+        
+        const qrBox = document.getElementById('qrcode');
+        if (qrBox) {
+            qrBox.innerHTML = '';
+            let targetURL = "https://mirole04-ux.github.io/katalog/?id=" + cleanId;
+            safeSetText('qr-url-text', targetURL);
+            new QRCode(qrBox, { text: targetURL, width: 180, height: 180 });
+        }
+        document.getElementById('qr-modal').style.display = 'flex';
+    }
+
+    function hideQRCode() { document.getElementById('qr-modal').style.display = 'none'; }
+
+    function openPrintView() {
+        const printGrid = document.getElementById('print-grid');
+        if (!printGrid) return;
+        printGrid.innerHTML = '';
+
+        allItems.forEach((item, index) => {
+            const code = getItemCode(item, index);
+            const cleanId = code.replace(/[^0-9]/g, '');
+            const title = getItemName(item);
+            const targetURL = "https://mirole04-ux.github.io/katalog/?id=" + cleanId;
+
+            const card = document.createElement('div');
+            card.className = 'qr-card';
+            const qrContainerId = 'print-qr-' + index;
+
+            card.innerHTML = `
+                <div class="qr-card-code">${code.startsWith('#') ? code : '#' + code}</div>
+                <div class="qr-card-title">${title}</div>
+                <div class="qr-card-img" id="${qrContainerId}"></div>
+            `;
+            printGrid.appendChild(card);
+            new QRCode(document.getElementById(qrContainerId), { text: targetURL, width: 130, height: 130 });
+        });
+
+        document.getElementById('print-view').style.display = 'block';
+    }
+
+    function closePrintView() { document.getElementById('print-view').style.display = 'none'; }
+
+    fetch('katalog.json?t=' + Date.now())
+        .then(res => {
+            if (!res.ok) throw new Error("Soubor katalog.json nebyl nalezen (HTTP " + res.status + ")");
+            return res.json();
+        })
+        .then(data => initCatalog(data))
+        .catch(err => showError("Nelze načíst soubor katalog.json: " + err.message));
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker zaregistrován!'))
+        .catch(err => console.log('Chyba registraci SW:', err));
+    });
+  }
+</script>
+
+</body>
+</html>

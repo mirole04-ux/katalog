@@ -1,0 +1,21 @@
+{
+  "short_name": "Katalog",
+  "name": "Katalog Artefaktů a Nožů",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/ffb703/000000?text=M-001",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/ffb703/000000?text=M-001",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#121212",
+  "theme_color": "#ffb703",
+  "display": "standalone",
+  "orientation": "portrait"
+}
